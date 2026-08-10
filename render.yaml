@@ -1,0 +1,37 @@
+services:
+  # Express API — verifies Clerk JWTs independently, calls Claude
+  - type: web
+    name: twitcher-api
+    runtime: node
+    rootDir: api
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # Comma-separated. Must include the deployed web/ URL once you know it
+      # (see README) — used for both CORS and the JWT authorizedParties check.
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # Next.js frontend — Clerk-gated UI
+  - type: web
+    name: twitcher-web
+    runtime: node
+    rootDir: web
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # The deployed api/ service's URL, e.g. https://twitcher-api.onrender.com
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

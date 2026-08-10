@@ -82,6 +82,21 @@ Both `CLERK_SECRET_KEY` values must match — same Clerk app, verified independe
 
 `next dev` and the Express server both already bind to your machine's LAN address, but two env vars are hardcoded to `localhost` by default and need updating to your LAN IP: `NEXT_PUBLIC_API_BASE_URL` in `web/.env.local`, and `ALLOWED_ORIGINS` in `api/.env` (comma-separate it alongside `localhost:3000` rather than replacing it). Restart both dev servers after changing either, then browse to `http://<your-LAN-IP>:3000` from the other device — not `localhost`. If Clerk's sign-in flow gets stuck in a redirect loop over a raw LAN IP, fall back to an `ngrok` tunnel for both ports instead.
 
+## Deploying to Render
+
+`render.yaml` at the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec) defining both services as one deploy:
+
+1. In the Render dashboard: **New → Blueprint**, connect this GitHub repo. Render reads `render.yaml` and proposes both `twitcher-api` and `twitcher-web`.
+2. It'll prompt for each `sync: false` env var — for the first deploy, use placeholder values for `NEXT_PUBLIC_API_BASE_URL` and `ALLOWED_ORIGINS` (they reference each other's URL, which doesn't exist yet).
+3. Once both are deployed, note their actual `*.onrender.com` URLs, then go back into each service's **Environment** tab and fix the two cross-referencing values:
+   - `twitcher-web`'s `NEXT_PUBLIC_API_BASE_URL` → the `twitcher-api` URL
+   - `twitcher-api`'s `ALLOWED_ORIGINS` → the `twitcher-web` URL (this is also the JWT `authorizedParties` allowlist, so it has to be exact)
+4. Updating either triggers a redeploy of that service automatically.
+
+Both `package.json`s already have `build`/`start` scripts matching what `render.yaml` runs, and a `.node-version` file pins each service to Node 24. `PORT` is set to `10000` in the blueprint to match what Render expects — both apps already read `process.env.PORT`, so nothing else to configure there. I ran the exact `npm run build && npm start` sequence locally on port 10000 before writing this to confirm both come up cleanly.
+
+Free-tier Render web services spin down after 15 minutes idle and take 30–60s to cold-start back up — fine for a demo, worth knowing if the first request after a while feels stuck.
+
 ## Why Haiku, and why no `effort`
 
 The model is `claude-haiku-4-5` — the cheapest current Claude tier — with no extended thinking and a small `max_tokens`. Bird ID from a photo is a bounded classification task, not open-ended reasoning, so it doesn't benefit much from a larger model or deeper thinking, and keeping cost per request low mattered for a demo app anyone could hit repeatedly. Structured output is enforced via `output_config.format` (JSON schema), so the response is always parseable — no prompt-and-pray JSON extraction.
@@ -96,7 +111,6 @@ twitcher/
 
 ## Possible next steps
 
-- Deploy both services to [Render](https://render.com)
 - A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
 - Swap in a different model tier if accuracy on tricky species needs to beat cost
 
