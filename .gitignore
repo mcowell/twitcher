@@ -1,0 +1,18 @@
+# Claude Code's local, personal settings — not shared project config
+.claude/settings.local.json
+
+# Secrets — belt and suspenders on top of web/ and api/'s own .gitignore
+.env
+.env.local
+.env*.local
+!.env.example
+
+# Dependencies / build output, in case anything ever lives outside web/ or api/
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# OS cruft
+.DS_Store
+*.log
