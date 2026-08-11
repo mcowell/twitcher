@@ -42,7 +42,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 </SignInButton>
               </Show>
               <Show when="signed-in">
-                <UserButton />
+                <UserButton
+                  showName
+                  appearance={{
+                    elements: {
+                      userButtonOuterIdentifier: "text-white font-medium",
+                    },
+                  }}
+                />
               </Show>
             </header>
             {children}
