@@ -46,7 +46,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   showName
                   appearance={{
                     elements: {
-                      userButtonOuterIdentifier: "text-white font-medium",
+                      // A className string lost a specificity fight against
+                      // Clerk's own component styles. This CSS-object form
+                      // applies as inline styles instead, which reliably wins.
+                      userButtonOuterIdentifier: {
+                        color: "#ffffff",
+                        fontWeight: 700,
+                      },
                     },
                   }}
                 />
