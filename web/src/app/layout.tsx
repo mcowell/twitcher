@@ -29,10 +29,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-gradient-to-b from-sky-50 to-white text-gray-900">
         <ClerkProvider>
           <ResetProvider>
-            <header className="flex items-center justify-between gap-3 px-6 py-4 border-b border-sky-100 bg-white/70 backdrop-blur">
+            <header className="flex items-center justify-between gap-3 px-6 py-4 bg-gradient-to-r from-sky-600 to-sky-800">
               <HeaderLogo />
               <Show when="signed-out">
-                <SignInButton />
+                <SignInButton>
+                  <button
+                    type="button"
+                    className="rounded-full bg-white text-sky-700 px-4 py-1.5 text-sm font-medium hover:bg-sky-50 transition-colors cursor-pointer"
+                  >
+                    Login
+                  </button>
+                </SignInButton>
               </Show>
               <Show when="signed-in">
                 <UserButton />

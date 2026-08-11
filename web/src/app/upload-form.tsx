@@ -162,7 +162,7 @@ export function UploadForm() {
               <span className="text-4xl" aria-hidden>
                 📷
               </span>
-              <p className="font-medium">Drag a photo here, or click to browse</p>
+              <p className="font-medium text-gray-700">Drag a photo here, or click to browse</p>
               <p className="text-xs text-gray-500">JPEG, PNG, WEBP, or GIF</p>
             </>
           )}

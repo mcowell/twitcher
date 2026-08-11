@@ -1,11 +1,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { HomeContent } from "./home-content";
+import { Splash } from "./splash";
 
 export default async function Home() {
-  // Redirects signed-out visitors to sign-in. Combined with Clerk's
-  // "Restricted" sign-up mode (invite-only), this means only people you've
-  // explicitly invited can ever reach the page that triggers an API call.
-  await auth.protect();
+  // auth() (not .protect()) reads sign-in state without redirecting, so
+  // signed-out visitors see the splash page here instead of getting bounced
+  // straight to Clerk. The actual security boundary is unchanged — it's the
+  // Express API requiring a valid Clerk JWT, not this page.
+  const { userId } = await auth();
 
-  return <HomeContent />;
+  return userId ? <HomeContent /> : <Splash />;
 }
