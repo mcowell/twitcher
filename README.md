@@ -82,15 +82,15 @@ Both `CLERK_SECRET_KEY` values must match — same Clerk app, verified independe
 
 `next dev` and the Express server both already bind to your machine's LAN address, but two env vars are hardcoded to `localhost` by default and need updating to your LAN IP: `NEXT_PUBLIC_API_BASE_URL` in `web/.env.local`, and `ALLOWED_ORIGINS` in `api/.env` (comma-separate it alongside `localhost:3000` rather than replacing it). Restart both dev servers after changing either, then browse to `http://<your-LAN-IP>:3000` from the other device — not `localhost`. If Clerk's sign-in flow gets stuck in a redirect loop over a raw LAN IP, fall back to an `ngrok` tunnel for both ports instead.
 
-## Custom domain (cowell.ca)
+## Custom domain
 
-Twitcher runs on three subdomains of `cowell.ca`:
+Twitcher runs on three subdomains of a single domain — substitute your own for `yourdomain.com` below:
 
 | Subdomain | Points to | Why here, not under `twitcher.` |
 |---|---|---|
-| `twitcher.cowell.ca` | Render — `twitcher-web` | The app itself |
-| `api.cowell.ca` | Render — `twitcher-api` | Kept at the `cowell.ca` root since this API could plausibly serve other projects later — though today it's a direct CNAME to this one service, not a shared gateway, so don't read more permanence into the name than exists yet |
-| `clerk.cowell.ca` | Clerk | Also at the root, so future `cowell.ca` projects could share this same Clerk production instance (Clerk calls this pattern satellite domains) |
+| `twitcher.yourdomain.com` | Render — `twitcher-web` | The app itself |
+| `api.yourdomain.com` | Render — `twitcher-api` | Kept at the domain root since this API could plausibly serve other projects later — though today it's a direct CNAME to this one service, not a shared gateway, so don't read more permanence into the name than exists yet |
+| `clerk.yourdomain.com` | Clerk | Also at the root, so future projects on the same domain could share this same Clerk production instance (Clerk calls this pattern satellite domains) |
 
 ### Clerk: dev → production is a real migration, not a toggle
 
@@ -103,7 +103,7 @@ The [Clerk CLI](https://clerk.com/docs/guides/development/deployment/production)
 
 ### DNS records
 
-Each subdomain needs a CNAME at your DNS provider: `twitcher.cowell.ca` and `api.cowell.ca` point at whatever `*.onrender.com` target Render shows after adding the domain in each service's Settings; `clerk.cowell.ca` (plus a couple of Clerk-managed mail/DKIM records) point at whatever the Clerk Dashboard's Domains page specifies.
+Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and `api.yourdomain.com` point at whatever `*.onrender.com` target Render shows after adding the domain in each service's Settings; `clerk.yourdomain.com` (plus a couple of Clerk-managed mail/DKIM records) point at whatever the Clerk Dashboard's Domains page specifies.
 
 ## Deploying to Render
 
@@ -116,12 +116,12 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.cowell.ca` and `api
    |---|---|---|
    | `twitcher-web` | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk production publishable key (`pk_live_...`) |
    | `twitcher-web` | `CLERK_SECRET_KEY` | Clerk production secret key (`sk_live_...`) |
-   | `twitcher-web` | `NEXT_PUBLIC_API_BASE_URL` | `https://api.cowell.ca` |
+   | `twitcher-web` | `NEXT_PUBLIC_API_BASE_URL` | `https://api.yourdomain.com` |
    | `twitcher-api` | `CLERK_SECRET_KEY` | same production secret key as above |
    | `twitcher-api` | `ANTHROPIC_API_KEY` | same value as local `api/.env` |
-   | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.cowell.ca` |
+   | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
 
-3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain-cowellca) above).
+3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).
 
 Both `package.json`s already have `build`/`start` scripts matching what `render.yaml` runs, and a `.node-version` file pins each service to Node 24. `PORT` is set to `10000` in the blueprint to match what Render expects — both apps already read `process.env.PORT`, so nothing else to configure there. I ran the exact `npm run build && npm start` sequence locally on port 10000 before writing this to confirm both come up cleanly.
 
