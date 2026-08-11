@@ -10,7 +10,7 @@ Built end-to-end with **[Claude Code](https://claude.com/product/claude-code)**,
 |---|---|
 | Frontend | [Next.js 16](https://nextjs.org) (App Router), TypeScript, [Tailwind CSS 4](https://tailwindcss.com) |
 | Backend | [Express 5](https://expressjs.com), TypeScript |
-| AI | [Claude API](https://platform.claude.com) — `claude-haiku-4-5`, structured JSON-schema output |
+| AI | [Claude API](https://platform.claude.com) — `claude-opus-5`, structured JSON-schema output |
 | Auth | [Clerk](https://clerk.com) — invite-only sign-up, JWT-based API auth |
 | Dev tooling | `tsx` (API hot reload), ESLint, Turbopack |
 
@@ -21,7 +21,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 ```
 ┌──────────────┐   Clerk session JWT    ┌──────────────┐   Anthropic API key   ┌───────────┐
 │   Browser    │ ───────────────────▶   │   web/       │ ─────────────────▶    │  Claude   │
-│  (Twitcher)  │  signs in via Clerk    │  Next.js UI  │   (server-side,        │  Haiku 4.5│
+│  (Twitcher)  │  signs in via Clerk    │  Next.js UI  │   (server-side,       │  Opus 5   │
 └──────────────┘                        └──────┬───────┘    api/ only)         └───────────┘
                                                 │
                                     Authorization: Bearer <JWT>
@@ -127,9 +127,9 @@ Both `package.json`s already have `build`/`start` scripts matching what `render.
 
 **Free tier, and what it actually costs:** $0, and it does support custom domains + managed TLS — no forced upgrade there. The trade-offs: each service spins down after 15 minutes with no traffic and takes 30–60s to cold-start back up on the next request (fine for a personal/demo app, not for something latency-sensitive); the account gets 750 free instance-hours/month shared across *all* free services, and a single service running 24/7 alone would already use ~730 of those — so if both `twitcher-web` and `twitcher-api` end up getting enough steady traffic to stay constantly awake, you'd bump into that shared cap before the month is out. For occasional personal use (which is what spin-down is for) this comfortably fits; if it ever needs to stay warm full-time, Starter is $7/service/month.
 
-## Why Haiku, and why no `effort`
+## Why Opus 5
 
-The model is `claude-haiku-4-5` — the cheapest current Claude tier — with no extended thinking and a small `max_tokens`. Bird ID from a photo is a bounded classification task, not open-ended reasoning, so it doesn't benefit much from a larger model or deeper thinking, and keeping cost per request low mattered for a demo app anyone could hit repeatedly. Structured output is enforced via `output_config.format` (JSON schema), so the response is always parseable — no prompt-and-pray JSON extraction.
+The model is `claude-opus-5`. It started out on `claude-haiku-4-5` — the cheapest current Claude tier — on the theory that bird ID from a photo is a bounded classification task that wouldn't benefit much from a larger model. In practice, Haiku misidentified some harder photos (a wasp photographed near a roof, read as a house sparrow), so this trades a higher per-request cost for meaningfully better vision accuracy. Structured output is enforced via `output_config.format` (JSON schema), so the response is always parseable — no prompt-and-pray JSON extraction.
 
 ## Project layout
 
@@ -142,7 +142,8 @@ twitcher/
 ## Possible next steps
 
 - A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
-- Swap in a different model tier if accuracy on tricky species needs to beat cost
+- An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
+- A history page showing the last N identified images
 
 ---
 
