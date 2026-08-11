@@ -72,6 +72,30 @@ export function UploadForm() {
     setStatus("idle");
   }, []);
 
+  // Paste a screenshot or copied image straight in — works anywhere on the
+  // page, not just while the dropzone is focused. Only acts on clipboard
+  // data that actually contains an image; anything else passes through
+  // untouched (there's no text input here for it to interfere with).
+  useEffect(() => {
+    function handlePaste(event: ClipboardEvent) {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const pastedFile = item.getAsFile();
+          if (pastedFile) {
+            event.preventDefault();
+            selectFile(pastedFile);
+          }
+          return;
+        }
+      }
+    }
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [selectFile]);
+
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragging(false);
@@ -162,7 +186,7 @@ export function UploadForm() {
               <span className="text-4xl" aria-hidden>
                 📷
               </span>
-              <p className="font-medium text-gray-700">Drag a photo here, or click to browse</p>
+              <p className="font-medium text-gray-700">Drag a photo here, click to browse, or paste</p>
               <p className="text-xs text-gray-500">JPEG, PNG, WEBP, or GIF</p>
             </>
           )}
