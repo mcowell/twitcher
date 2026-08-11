@@ -84,12 +84,11 @@ export async function identifyBird(
   mimeType: SupportedImageMimeType,
 ): Promise<BirdIdentification> {
   const response = await client.messages.create({
-    // Cheapest tier that supports structured outputs. No `effort` param —
-    // it isn't supported on Haiku 4.5, and this model doesn't spend tokens
-    // on internal thinking unless explicitly configured, which keeps
-    // per-request cost down for this bounded classification task.
-    model: "claude-haiku-4-5",
-    max_tokens: 512,
+    model: "claude-opus-5",
+    // Opus 5 thinks by default, and max_tokens caps thinking + response
+    // together — 512 was sized for Haiku's no-thinking output and would
+    // truncate mid-JSON here.
+    max_tokens: 2048,
     output_config: {
       format: {
         type: "json_schema",
