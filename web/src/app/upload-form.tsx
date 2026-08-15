@@ -32,7 +32,7 @@ const CONFIDENCE_STYLES: Record<BirdIdentification["confidence"], string> = {
   low: "bg-red-100 text-red-800",
 };
 
-export function UploadForm() {
+export function UploadForm({ onIdentified }: { onIdentified?: () => void }) {
   const { getToken } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -144,6 +144,7 @@ export function UploadForm() {
       }
       setResult(data as BirdIdentification);
       setStatus("success");
+      onIdentified?.();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Something went wrong.");

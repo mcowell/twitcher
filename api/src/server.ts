@@ -4,6 +4,7 @@ import { config } from "./config";
 import { identifyRouter } from "./routes/identify";
 import { meRouter } from "./routes/me";
 import { adminRouter } from "./routes/admin";
+import { identificationsRouter } from "./routes/identifications";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -27,6 +28,7 @@ app.get("/health", (_req, res) => {
 app.use("/", identifyRouter);
 app.use("/", meRouter);
 app.use("/", adminRouter);
+app.use("/", identificationsRouter);
 
 app.use(errorHandler);
 

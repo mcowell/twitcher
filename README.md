@@ -48,6 +48,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Responsive layout — upload and results side by side on desktop, stacked on mobile
 - A small animated bird while Claude is thinking
 - Click the logo to reset and identify another bird
+- A "recently identified" strip showing your last 3 matches, thumbnail and all
 - Public sign-up, but new accounts need manual approval before they can identify anything
 
 ## Getting started
@@ -81,6 +82,27 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
   alter table app_users enable row level security;
   ```
 
+- Then this, to store each identification (image + result) for the "recently identified" strip:
+
+  ```sql
+  create table identifications (
+    id uuid primary key default gen_random_uuid(),
+    clerk_user_id text not null references app_users(clerk_user_id),
+    image_path text not null,
+    is_bird boolean not null,
+    is_fictional_or_costume boolean not null,
+    common_name text not null,
+    scientific_name text not null,
+    confidence text not null check (confidence in ('low', 'medium', 'high')),
+    description text not null,
+    alternative_possibilities jsonb not null default '[]'::jsonb,
+    created_at timestamptz not null default now()
+  );
+  create index identifications_clerk_user_id_created_at_idx on identifications (clerk_user_id, created_at desc);
+  alter table identifications enable row level security;
+  ```
+
+- And create a **private** Storage bucket named `bird-images` (Storage → New bucket, leave "Public bucket" off). Images are served to the browser via short-lived signed URLs generated server-side (`GET /identifications`), never a public bucket URL.
 - Grab the project URL and the **service-role key** (not the anon key) from **Settings → API**.
 - Approving accounts is done at **`/admin`** in the web app (see [Admin access](#admin-access) below) — the Supabase table editor still works as a fallback if you'd rather edit `app_users` rows directly.
 - Free tier auto-pauses a project after 7 days with no database activity — for an app used more than weekly this doesn't come up, but if it goes quiet, the next request just needs the project manually unpaused from the Supabase dashboard first.
@@ -184,7 +206,7 @@ twitcher/
 
 - A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
-- Storing each identification (image + result) in Supabase, so a "your last N matches" / "top 5 matches" view becomes possible
+- A full history page, now that identifications are persisted — the home page only shows the last 3
 
 ---
 
