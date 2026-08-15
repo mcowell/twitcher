@@ -11,7 +11,8 @@ Built end-to-end with **[Claude Code](https://claude.com/product/claude-code)**,
 | Frontend | [Next.js 16](https://nextjs.org) (App Router), TypeScript, [Tailwind CSS 4](https://tailwindcss.com) |
 | Backend | [Express 5](https://expressjs.com), TypeScript |
 | AI | [Claude API](https://platform.claude.com) — `claude-opus-5`, structured JSON-schema output |
-| Auth | [Clerk](https://clerk.com) — invite-only sign-up, JWT-based API auth |
+| Auth | [Clerk](https://clerk.com) — public sign-up, JWT-based API auth |
+| Database | [Supabase](https://supabase.com) — Postgres, tracks manual account approval |
 | Dev tooling | `tsx` (API hot reload), ESLint, Turbopack |
 
 ## Architecture
@@ -27,14 +28,15 @@ This is deliberately **two separately deployable services**, not a single full-s
                                     Authorization: Bearer <JWT>
                                                 │
                                                 ▼
-                                         ┌──────────────┐
-                                         │   api/       │
-                                         │  Express API │
-                                         └──────────────┘
+                                         ┌──────────────┐   service-role key   ┌───────────┐
+                                         │   api/       │ ────────────────▶    │ Supabase  │
+                                         │  Express API │                      │ (Postgres)│
+                                         └──────────────┘                      └───────────┘
 ```
 
-- **`web/`** — the Next.js frontend. Clerk gates every page (`auth.protect()`), and the browser fetches a short-lived Clerk session token (`useAuth().getToken()`) to send with each request.
+- **`web/`** — the Next.js frontend. Clerk gates every page (`auth.protect()`), and the browser fetches a short-lived Clerk session token (`useAuth().getToken()`) to send with each request. `/` also does a server-side `GET /me` call to decide whether to show the splash, the pending-approval screen, or the app itself.
 - **`api/`** — a standalone Express API with zero dependency on Next.js or Clerk's frontend SDK. It verifies the incoming JWT itself, via the framework-agnostic `@clerk/backend` package, before calling Claude. Because it only cares about "is this a validly-signed token," it isn't tied to the Next.js login flow — any client that can present a valid JWT can call it.
+- **Supabase** sits entirely behind `api/`, accessed only with the service-role key — the browser and `web/` never talk to it directly, and there's no Postgres RLS in play. It's the system of record for account approval today (`app_users` table), and the natural place to store per-identification results later (see [Possible next steps](#possible-next-steps)).
 - CORS on the API is locked to known frontend origins, but **CORS isn't the security boundary** — token verification is. A non-browser client ignores CORS entirely; what actually stops unauthenticated use is `verifyToken()` rejecting the request.
 - Both services fail closed: neither will boot without their required secrets configured.
 
@@ -46,28 +48,45 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Responsive layout — upload and results side by side on desktop, stacked on mobile
 - A small animated bird while Claude is thinking
 - Click the logo to reset and identify another bird
-- Invite-only access — no public sign-up
+- Public sign-up, but new accounts need manual approval before they can identify anything
 
 ## Getting started
 
-Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/settings/keys), and a [Clerk](https://dashboard.clerk.com) application.
+Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/settings/keys), a [Clerk](https://dashboard.clerk.com) application, and a [Supabase](https://supabase.com) project.
 
 ### 1. Clerk
 
-- Create a Clerk app, then go to **Configure → Restrictions** and enable **Restricted mode** — this is what makes sign-up invite-only.
-- Invite yourself (and anyone else) from **Users → Invitations**.
-- Grab the publishable key, secret key from **API Keys**.
+- Create a Clerk app. Sign-up is public (**Configure → Restrictions** should be off/allow sign-ups) — the approval gate below is what actually controls access, not Clerk itself.
+- Grab the publishable key and secret key from **API Keys**.
 
-### 2. API (`api/`)
+### 2. Supabase
+
+- Create a free Supabase project, then run this in the SQL editor to create the approvals table:
+
+  ```sql
+  create table app_users (
+    clerk_user_id text primary key,
+    email text,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    created_at timestamptz not null default now(),
+    approved_at timestamptz
+  );
+  ```
+
+- Grab the project URL and the **service-role key** (not the anon key) from **Settings → API**.
+- There's no admin UI — approving someone is a manual `update app_users set status = 'approved', approved_at = now() where clerk_user_id = '...'` in the Supabase SQL editor or Table editor. The row's `email` column (populated from Clerk on first sign-in) is there so you know who you're approving.
+- Free tier auto-pauses a project after 7 days with no database activity — for an app used more than weekly this doesn't come up, but if it goes quiet, the next request just needs the project manually unpaused from the Supabase dashboard first.
+
+### 3. API (`api/`)
 
 ```sh
 cd api
-cp .env.example .env   # fill in ANTHROPIC_API_KEY and CLERK_SECRET_KEY
+cp .env.example .env   # fill in ANTHROPIC_API_KEY, CLERK_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 npm install
 npm run dev             # http://localhost:4000
 ```
 
-### 3. Web (`web/`)
+### 4. Web (`web/`)
 
 ```sh
 cd web
@@ -96,8 +115,8 @@ Twitcher runs on three subdomains of a single domain — substitute your own for
 
 Clerk's dev and production instances are genuinely separate — going to production creates a *new* instance under the same application, and settings don't copy over automatically. Two things bit us here specifically, and would've been easy to miss:
 
-- **Restricted (invite-only) mode had to be re-enabled on production.** The dev instance had it on; the fresh production instance defaulted back to public sign-up. Skipping this would have silently undone the entire point of using Clerk in this project.
-- **Google sign-in needed its own production OAuth credentials**, which the dev instance doesn't require (it uses shared placeholder credentials). Since this app is invite-only anyway, we disabled Google sign-in in production rather than standing up a Google Cloud OAuth app for it.
+- **`sign_up_mode` doesn't carry over between instances**, and defaults can differ from what dev was set to — worth explicitly checking (`clerk config pull --instance prod`) rather than assuming production matches dev.
+- **Google sign-in needs its own production OAuth credentials**, which the dev instance doesn't require (it uses shared placeholder credentials). We left Google sign-in disabled in production rather than standing up a Google Cloud OAuth app for it — email/password is enough for an app gated by manual approval anyway.
 
 The [Clerk CLI](https://clerk.com/docs/guides/development/deployment/production) (`npx clerk@latest`) is worth knowing about here — `clerk deploy status` reports exactly what's blocking production readiness (pending DNS records, unconfigured OAuth providers, etc.) as structured JSON, and `clerk config pull/patch --instance prod` can read and change instance settings like the two above directly, without going through the dashboard.
 
@@ -119,6 +138,8 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
    | `twitcher-web` | `NEXT_PUBLIC_API_BASE_URL` | `https://api.yourdomain.com` |
    | `twitcher-api` | `CLERK_SECRET_KEY` | same production secret key as above |
    | `twitcher-api` | `ANTHROPIC_API_KEY` | same value as local `api/.env` |
+   | `twitcher-api` | `SUPABASE_URL` | same value as local `api/.env` |
+   | `twitcher-api` | `SUPABASE_SERVICE_ROLE_KEY` | same value as local `api/.env` |
    | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
 
 3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).
@@ -143,7 +164,8 @@ twitcher/
 
 - A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
-- A history page showing the last N identified images
+- Storing each identification (image + result) in Supabase, so a "your last N matches" / "top 5 matches" view becomes possible
+- An admin UI for approving accounts, instead of hand-editing rows in the Supabase table editor
 
 ---
 

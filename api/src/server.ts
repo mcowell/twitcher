@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config";
 import { identifyRouter } from "./routes/identify";
+import { meRouter } from "./routes/me";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -21,6 +22,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/", identifyRouter);
+app.use("/", meRouter);
 
 app.use(errorHandler);
 

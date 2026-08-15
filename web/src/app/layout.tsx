@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider, SignInButton, Show, UserButton } from "@clerk/nextjs";
+import { ClerkProvider, SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { ResetProvider } from "./reset-context";
 import { HeaderLogo } from "./header-logo";
 import "./globals.css";
@@ -32,14 +32,24 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <header className="flex items-center justify-between gap-3 px-6 py-4 bg-gradient-to-r from-sky-600 to-sky-800">
               <HeaderLogo />
               <Show when="signed-out">
-                <SignInButton>
-                  <button
-                    type="button"
-                    className="rounded-full bg-white text-sky-700 px-4 py-1.5 text-sm font-medium hover:bg-sky-50 transition-colors cursor-pointer"
-                  >
-                    Login
-                  </button>
-                </SignInButton>
+                <div className="flex items-center gap-2">
+                  <SignInButton>
+                    <button
+                      type="button"
+                      className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      Login
+                    </button>
+                  </SignInButton>
+                  <SignUpButton>
+                    <button
+                      type="button"
+                      className="rounded-full bg-white text-sky-700 px-4 py-1.5 text-sm font-medium hover:bg-sky-50 transition-colors cursor-pointer"
+                    >
+                      Sign up
+                    </button>
+                  </SignUpButton>
+                </div>
               </Show>
               <Show when="signed-in">
                 <UserButton

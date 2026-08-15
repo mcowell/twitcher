@@ -12,6 +12,11 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
   clerkSecretKey: requireEnv("CLERK_SECRET_KEY"),
+  supabaseUrl: requireEnv("SUPABASE_URL"),
+  // Service-role key — full access, server-only. Never send this to the
+  // browser. The API is the only thing that talks to Supabase; there's no
+  // client-side Supabase usage and no RLS policy relies on it.
+  supabaseServiceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
   // Comma-separated list of origins allowed to call this API (both for CORS
   // and as the Clerk `authorizedParties` allowlist, so a token minted for
   // one frontend can't be replayed against this API from somewhere else).

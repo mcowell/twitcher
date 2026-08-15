@@ -14,6 +14,10 @@ services:
         sync: false
       - key: CLERK_SECRET_KEY
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       # Comma-separated. Used for both CORS and the JWT authorizedParties
       # check — value: https://twitcher.yourdomain.com (see README).
       - key: ALLOWED_ORIGINS

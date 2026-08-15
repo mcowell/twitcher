@@ -13,6 +13,9 @@ dist/
 .next/
 *.tsbuildinfo
 
+# Local Supabase CLI cache (created by `supabase projects`/`link` commands)
+supabase/.temp/
+
 # OS cruft
 .DS_Store
 *.log
