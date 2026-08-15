@@ -70,7 +70,11 @@ export function AdminTable({ initialUsers }: { initialUsers: AppUser[] }) {
                   {user.status}
                 </span>
               </td>
-              <td className="px-4 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
+              {/* Plain ISO-date slice, not toLocaleDateString() — that
+                  formats using the runtime's locale/timezone, which can
+                  differ between the server render and the browser and
+                  causes a hydration mismatch. */}
+              <td className="px-4 py-3 text-gray-500">{user.createdAt.slice(0, 10)}</td>
               <td className="px-4 py-3 flex gap-2">
                 {user.status !== "approved" && (
                   <button

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider, SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { ResetProvider } from "./reset-context";
 import { HeaderLogo } from "./header-logo";
+import { getMe } from "./get-me";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,7 +22,9 @@ export const metadata: Metadata = {
   description: "Upload a bird photo and get it identified by Claude.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const me = await getMe();
+
   return (
     <html
       lang="en"
@@ -52,20 +56,30 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 </div>
               </Show>
               <Show when="signed-in">
-                <UserButton
-                  showName
-                  appearance={{
-                    elements: {
-                      // A className string lost a specificity fight against
-                      // Clerk's own component styles. This CSS-object form
-                      // applies as inline styles instead, which reliably wins.
-                      userButtonOuterIdentifier: {
-                        color: "#ffffff",
-                        fontWeight: 700,
+                <div className="flex items-center gap-3">
+                  {me?.isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <UserButton
+                    showName
+                    appearance={{
+                      elements: {
+                        // A className string lost a specificity fight against
+                        // Clerk's own component styles. This CSS-object form
+                        // applies as inline styles instead, which reliably wins.
+                        userButtonOuterIdentifier: {
+                          color: "#ffffff",
+                          fontWeight: 700,
+                        },
                       },
-                    },
-                  }}
-                />
+                    }}
+                  />
+                </div>
               </Show>
             </header>
             {children}

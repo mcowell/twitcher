@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireClerkAuth } from "../middleware/auth";
 import { getOrCreateAppUser } from "../services/appUsers";
+import { clerkClient } from "../services/clerk";
 
 export const meRouter = Router();
 
@@ -9,8 +10,14 @@ export const meRouter = Router();
 // state, so it has to work for pending users too.
 meRouter.get("/me", requireClerkAuth, async (req, res, next) => {
   try {
-    const appUser = await getOrCreateAppUser(req.userId as string);
-    res.json({ status: appUser.status });
+    const [appUser, clerkUser] = await Promise.all([
+      getOrCreateAppUser(req.userId as string),
+      clerkClient.users.getUser(req.userId as string),
+    ]);
+    res.json({
+      status: appUser.status,
+      isAdmin: clerkUser.privateMetadata?.role === "admin",
+    });
   } catch (error) {
     next(error);
   }
