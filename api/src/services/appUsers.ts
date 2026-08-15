@@ -76,3 +76,25 @@ export async function getOrCreateAppUser(clerkUserId: string): Promise<AppUser> 
 
   return mapRow(created);
 }
+
+export async function listAppUsers(): Promise<AppUser[]> {
+  const { data, error } = await supabase
+    .from("app_users")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data as AppUserRow[]).map(mapRow);
+}
+
+export async function updateAppUserStatus(clerkUserId: string, status: ApprovalStatus): Promise<AppUser> {
+  const { data, error } = await supabase
+    .from("app_users")
+    .update({ status, approved_at: status === "approved" ? new Date().toISOString() : null })
+    .eq("clerk_user_id", clerkUserId)
+    .select()
+    .single<AppUserRow>();
+
+  if (error) throw error;
+  return mapRow(data);
+}

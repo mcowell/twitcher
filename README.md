@@ -82,8 +82,20 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
   ```
 
 - Grab the project URL and the **service-role key** (not the anon key) from **Settings → API**.
-- There's no admin UI — approving someone is a manual `update app_users set status = 'approved', approved_at = now() where clerk_user_id = '...'` in the Supabase SQL editor or Table editor. The row's `email` column (populated from Clerk on first sign-in) is there so you know who you're approving.
+- Approving accounts is done at **`/admin`** in the web app (see [Admin access](#admin-access) below) — the Supabase table editor still works as a fallback if you'd rather edit `app_users` rows directly.
 - Free tier auto-pauses a project after 7 days with no database activity — for an app used more than weekly this doesn't come up, but if it goes quiet, the next request just needs the project manually unpaused from the Supabase dashboard first.
+
+### Admin access
+
+`/admin` lists every signed-up account and lets you approve, reject, or reset their status — it's the normal way to approve people day to day. It's gated by Clerk's `privateMetadata`, not by anything in `app_users`, since admin-ness is a property of the account rather than part of the approval workflow: only a user with `privateMetadata.role === "admin"` can reach it (`api/src/middleware/admin.ts`). There's no dashboard toggle for this — set it via the Clerk Backend API:
+
+```ts
+await clerkClient.users.updateUserMetadata(clerkUserId, {
+  privateMetadata: { role: "admin" },
+});
+```
+
+`privateMetadata` is only ever readable from server-side Clerk API calls, never from the frontend SDK, so this can't leak to the browser.
 
 ### 3. API (`api/`)
 
@@ -173,7 +185,6 @@ twitcher/
 - A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
 - Storing each identification (image + result) in Supabase, so a "your last N matches" / "top 5 matches" view becomes possible
-- An admin UI for approving accounts, instead of hand-editing rows in the Supabase table editor
 
 ---
 

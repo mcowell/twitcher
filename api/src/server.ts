@@ -3,6 +3,7 @@ import cors from "cors";
 import { config } from "./config";
 import { identifyRouter } from "./routes/identify";
 import { meRouter } from "./routes/me";
+import { adminRouter } from "./routes/admin";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -17,12 +18,15 @@ app.use(
   }),
 );
 
+app.use(express.json());
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 app.use("/", identifyRouter);
 app.use("/", meRouter);
+app.use("/", adminRouter);
 
 app.use(errorHandler);
 
