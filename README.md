@@ -71,6 +71,14 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
     created_at timestamptz not null default now(),
     approved_at timestamptz
   );
+
+  -- No policies defined below on purpose: with RLS on and zero policies,
+  -- PostgREST denies anon/authenticated access outright. The API's
+  -- service-role key bypasses RLS regardless, so this only closes off
+  -- access from anyone who ever obtained the anon/publishable key — belt
+  -- and suspenders, since that key is never actually used or exposed
+  -- anywhere in this app today.
+  alter table app_users enable row level security;
   ```
 
 - Grab the project URL and the **service-role key** (not the anon key) from **Settings → API**.
