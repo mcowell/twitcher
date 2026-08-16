@@ -46,10 +46,14 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex-1 min-w-0 rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1"
+            className="w-48 shrink-0 rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
-            <img src={item.imageUrl} alt={item.commonName} className="w-full h-24 object-cover rounded-lg" />
+            <img
+              src={item.imageUrl}
+              alt={item.commonName}
+              className="w-full aspect-square object-cover rounded-lg"
+            />
             <p className="text-xs font-medium truncate">
               {item.commonName}
               {item.isFictionalOrCostume && " 🎭"}

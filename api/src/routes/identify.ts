@@ -23,11 +23,14 @@ identifyRouter.post(
       const result = await identifyBird(req.file.buffer, mimeType);
       res.json(result);
 
-      // Best-effort: persisting the "last 3" history shouldn't fail the
-      // identification response the user is actually waiting on.
-      saveIdentification(req.userId as string, req.file.buffer, mimeType, result).catch((error) => {
-        console.error("Failed to save identification history:", error);
-      });
+      // Only persist actual bird sightings (not "no bird detected" misses) —
+      // best-effort, so a storage hiccup shouldn't fail the identification
+      // response the user is actually waiting on.
+      if (result.isBird) {
+        saveIdentification(req.userId as string, req.file.buffer, mimeType, result).catch((error) => {
+          console.error("Failed to save identification history:", error);
+        });
+      }
     } catch (error) {
       next(error);
     }
