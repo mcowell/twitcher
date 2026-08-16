@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { AdminTable, type AppUser } from "./admin-table";
+import { ServiceUnavailable } from "../service-unavailable";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -8,11 +9,17 @@ export default async function AdminPage() {
   const { userId, getToken } = await auth();
   if (!userId) redirect("/");
 
-  const token = await getToken();
-  const response = await fetch(`${API_BASE_URL}/admin/users`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    const token = await getToken();
+    response = await fetch(`${API_BASE_URL}/admin/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return <ServiceUnavailable />;
+  }
 
   if (response.status === 403) {
     return (
@@ -21,6 +28,8 @@ export default async function AdminPage() {
       </main>
     );
   }
+
+  if (!response.ok) return <ServiceUnavailable />;
 
   const users: AppUser[] = await response.json();
 

@@ -1,6 +1,7 @@
 import { HomeContent } from "./home-content";
 import { PendingApproval } from "./pending-approval";
 import { Splash } from "./splash";
+import { ServiceUnavailable } from "./service-unavailable";
 import { getMe } from "./get-me";
 
 export default async function Home() {
@@ -9,9 +10,10 @@ export default async function Home() {
   // The actual security boundary is unchanged — it's the Express API
   // requiring a valid Clerk JWT (and, now, an approved account), not this
   // page.
-  const me = await getMe();
+  const result = await getMe();
 
-  if (!me) return <Splash />;
+  if (result.kind === "unavailable") return <ServiceUnavailable />;
+  if (result.kind === "signed-out") return <Splash />;
 
-  return me.status === "approved" ? <HomeContent /> : <PendingApproval />;
+  return result.me.status === "approved" ? <HomeContent /> : <PendingApproval />;
 }

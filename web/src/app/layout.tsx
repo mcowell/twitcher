@@ -23,7 +23,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const me = await getMe();
+  const result = await getMe();
+  const isAdmin = result.kind === "ok" && result.me.isAdmin;
 
   return (
     <html
@@ -57,7 +58,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </Show>
               <Show when="signed-in">
                 <div className="flex items-center gap-3">
-                  {me?.isAdmin && (
+                  {isAdmin && (
                     <Link
                       href="/admin"
                       className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
