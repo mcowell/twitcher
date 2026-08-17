@@ -60,6 +60,26 @@ export async function saveIdentification(
   if (insertError) throw insertError;
 }
 
+// Identifications carry a foreign key to app_users, so this has to run
+// before an app_users row can be deleted — storage objects aren't covered
+// by that constraint and would otherwise be orphaned.
+export async function deleteAllForUser(clerkUserId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("image_path")
+    .eq("clerk_user_id", clerkUserId)
+    .returns<Pick<IdentificationRow, "image_path">[]>();
+  if (error) throw error;
+
+  if (data.length > 0) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove(data.map((row) => row.image_path));
+    if (removeError) throw removeError;
+  }
+
+  const { error: deleteError } = await supabase.from("identifications").delete().eq("clerk_user_id", clerkUserId);
+  if (deleteError) throw deleteError;
+}
+
 export async function listRecentIdentifications(
   clerkUserId: string,
   limit: number,

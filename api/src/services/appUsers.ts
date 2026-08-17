@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { clerkClient } from "./clerk";
 import { sendMail } from "./mailer";
 import { listNotificationEmails } from "./notificationEmails";
+import { deleteAllForUser } from "./identifications";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -116,4 +117,15 @@ export async function updateAppUserStatus(clerkUserId: string, status: ApprovalS
 
   if (error) throw error;
   return mapRow(data);
+}
+
+// Full removal, not just hiding them from the list — deletes their
+// identification history (rows + stored images) first, since app_users is
+// a foreign key target. Doesn't touch their actual Clerk account: they can
+// still sign in, but start over as a brand-new "pending" signup.
+export async function deleteAppUser(clerkUserId: string): Promise<void> {
+  await deleteAllForUser(clerkUserId);
+
+  const { error } = await supabase.from("app_users").delete().eq("clerk_user_id", clerkUserId);
+  if (error) throw error;
 }

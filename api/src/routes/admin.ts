@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireClerkAuth } from "../middleware/auth";
 import { requireAdmin } from "../middleware/admin";
-import { listAppUsers, updateAppUserStatus, type ApprovalStatus } from "../services/appUsers";
+import { listAppUsers, updateAppUserStatus, deleteAppUser, type ApprovalStatus } from "../services/appUsers";
 import { listNotificationEmails, addNotificationEmail, removeNotificationEmail } from "../services/notificationEmails";
 
 export const adminRouter = Router();
@@ -27,6 +27,20 @@ adminRouter.patch("/admin/users/:clerkUserId", requireClerkAuth, requireAdmin, a
 
     const updated = await updateAppUserStatus(req.params.clerkUserId as string, status);
     res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.delete("/admin/users/:clerkUserId", requireClerkAuth, requireAdmin, async (req, res, next) => {
+  try {
+    if (req.params.clerkUserId === req.userId) {
+      res.status(400).json({ error: "You can't remove your own account." });
+      return;
+    }
+
+    await deleteAppUser(req.params.clerkUserId as string);
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

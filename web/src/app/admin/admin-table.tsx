@@ -44,6 +44,23 @@ export function AdminTable({ initialUsers }: { initialUsers: AppUser[] }) {
     }
   }
 
+  async function removeUser(clerkUserId: string, email: string | null) {
+    if (!confirm(`Remove ${email ?? "this account"}? This deletes their identification history too.`)) return;
+
+    setPendingId(clerkUserId);
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_BASE_URL}/admin/users/${clerkUserId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Remove failed.");
+      setUsers((current) => current.filter((user) => user.clerkUserId !== clerkUserId));
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   if (users.length === 0) {
     return <p className="text-gray-500">No accounts yet.</p>;
   }
@@ -106,6 +123,14 @@ export function AdminTable({ initialUsers }: { initialUsers: AppUser[] }) {
                     Reset
                   </button>
                 )}
+                <button
+                  type="button"
+                  disabled={pendingId === user.clerkUserId}
+                  onClick={() => removeUser(user.clerkUserId, user.email)}
+                  className="rounded-full bg-red-50 text-red-700 px-3 py-1 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  Remove
+                </button>
               </td>
             </tr>
           ))}
