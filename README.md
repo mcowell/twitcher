@@ -168,7 +168,7 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
 
 ## Deploying to Render
 
-`render.yaml` at the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec) defining both services as one deploy, both explicitly on **`plan: free`** — leaving `plan` unset defaults to the paid Starter tier, so this is deliberate, not an oversight.
+`render.yaml` at the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec) defining both services as one deploy, both explicitly on **`plan: starter`** (see [Free tier vs. Starter](#free-tier-vs-starter) below for why, and for the free-tier alternative). Set `plan` explicitly either way — leaving it unset defaults to paid Starter, so an unset `plan` isn't the same as choosing free.
 
 1. In the Render dashboard: **New → Blueprint**, connect this GitHub repo. Render reads `render.yaml` and proposes both `twitcher-api` and `twitcher-web`.
 2. It'll prompt for each `sync: false` env var:
@@ -188,7 +188,11 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
 
 Both `package.json`s already have `build`/`start` scripts matching what `render.yaml` runs, and a `.node-version` file pins each service to Node 24. `PORT` is set to `10000` in the blueprint to match what Render expects — both apps already read `process.env.PORT`, so nothing else to configure there. I ran the exact `npm run build && npm start` sequence locally on port 10000 before writing this to confirm both come up cleanly.
 
-**Free tier, and what it actually costs:** $0, and it does support custom domains + managed TLS — no forced upgrade there. The trade-offs: each service spins down after 15 minutes with no traffic and takes 30–60s to cold-start back up on the next request (fine for a personal/demo app, not for something latency-sensitive); the account gets 750 free instance-hours/month shared across *all* free services, and a single service running 24/7 alone would already use ~730 of those — so if both `twitcher-web` and `twitcher-api` end up getting enough steady traffic to stay constantly awake, you'd bump into that shared cap before the month is out. For occasional personal use (which is what spin-down is for) this comfortably fits; if it ever needs to stay warm full-time, Starter is $7/service/month.
+### Free tier vs. Starter
+
+Free tier costs $0 and still supports custom domains + managed TLS — no forced upgrade there. The trade-offs: each service spins down after 15 minutes with no traffic and takes 30–60s to cold-start back up on the next request; the account gets 750 free instance-hours/month shared across *all* free services, and a single service running 24/7 alone would already use ~730 of those — so if both `twitcher-web` and `twitcher-api` end up getting enough steady traffic to stay constantly awake, you'd bump into that shared cap before the month is out.
+
+That cold start isn't just slow — while a service is asleep, Render can serve an HTML gateway page in place of a JSON response, which is survivable (the frontend shows a "waking up" message rather than crashing — see `web/src/app/service-unavailable.tsx`) but is still a bad first impression for a real visitor, not just an internal demo. Once there are actual invited users rather than just yourself testing, that's the point where free tier's UX cost stops being worth $0/month: this app now runs both services on **Starter ($7/service/month, $14/month total)** for exactly that reason. `plan: free` in `render.yaml` is still a completely reasonable choice if you're the only user or don't mind occasional cold starts — just change both `plan: starter` lines back to `plan: free` before deploying your own copy.
 
 ## Why Opus 5
 

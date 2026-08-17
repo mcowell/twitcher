@@ -3,7 +3,7 @@ services:
   - type: web
     name: twitcher-api
     runtime: node
-    plan: free
+    plan: starter
     rootDir: api
     buildCommand: npm ci && npm run build
     startCommand: npm start
@@ -27,7 +27,7 @@ services:
   - type: web
     name: twitcher-web
     runtime: node
-    plan: free
+    plan: starter
     rootDir: web
     buildCommand: npm ci && npm run build
     startCommand: npm start
