@@ -25,4 +25,12 @@ export const config = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   maxUploadBytes: 10 * 1024 * 1024, // 10MB
+  // Fastmail SMTP, used only to notify admins when a new account signs up
+  // and needs approval. smtpUser is the Fastmail account login (not
+  // necessarily the same as the From address below), authenticated with an
+  // app-specific password scoped to SMTP, not the account password.
+  smtpUser: requireEnv("SMTP_USER"),
+  smtpPassword: requireEnv("SMTP_PASSWORD"),
+  // Must be an address/alias already verified as sendable in Fastmail.
+  notificationFromEmail: requireEnv("NOTIFICATION_FROM_EMAIL"),
 };

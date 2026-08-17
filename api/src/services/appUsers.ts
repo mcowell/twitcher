@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 import { clerkClient } from "./clerk";
+import { sendMail } from "./mailer";
+import { listNotificationEmails } from "./notificationEmails";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -74,7 +76,24 @@ export async function getOrCreateAppUser(clerkUserId: string): Promise<AppUser> 
     throw insertError;
   }
 
+  // Best-effort — a notification failure shouldn't block the signup itself,
+  // and this only fires on the actual insert, not on repeat visits.
+  notifyAdminsOfNewSignup(email).catch((error) => {
+    console.error("Failed to send new-signup notification:", error);
+  });
+
   return mapRow(created);
+}
+
+async function notifyAdminsOfNewSignup(email: string | null): Promise<void> {
+  const recipients = await listNotificationEmails();
+  if (recipients.length === 0) return;
+
+  await sendMail(
+    recipients,
+    "Twitcher: new account needs approval",
+    `${email ?? "A new user"} just signed up and is waiting for approval.\n\nApprove at: /admin`,
+  );
 }
 
 export async function listAppUsers(): Promise<AppUser[]> {

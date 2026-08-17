@@ -50,6 +50,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Click the logo to reset and identify another bird
 - A "recently identified" strip showing your last 3 matches, thumbnail and all
 - Public sign-up, but new accounts need manual approval before they can identify anything
+- Admins get emailed the moment a new account needs approval
 
 ## Getting started
 
@@ -119,6 +120,24 @@ await clerkClient.users.updateUserMetadata(clerkUserId, {
 
 `privateMetadata` is only ever readable from server-side Clerk API calls, never from the frontend SDK, so this can't leak to the browser.
 
+### New-signup email notifications
+
+`/admin` also has a small "Notify on new signups" panel — add or remove email addresses, and each one gets emailed the moment a new account signs up and lands in `pending` (see `notifyAdminsOfNewSignup` in `api/src/services/appUsers.ts`, fired best-effort from the same lazy-create-on-first-sight path that creates the `app_users` row). The list itself lives in a `notification_emails` table:
+
+```sql
+create table notification_emails (
+  email text primary key,
+  created_at timestamptz not null default now()
+);
+alter table notification_emails enable row level security;
+```
+
+Sending goes through **Fastmail's SMTP relay** (`smtp.fastmail.com:587`, via `nodemailer`) rather than a dedicated transactional-email provider — volume here is at most a handful of emails a month, well under any sending limit, and routing through an address Fastmail already hosts means its existing SPF/DKIM covers deliverability with zero extra DNS setup. To set this up:
+
+1. In Fastmail, add the address you want to send from as an alias (**Settings → Addresses**) if it isn't a full mailbox already — e.g. `notify@yourdomain.com`, kept separate from any real inbox.
+2. Generate an app password scoped to **Mail/SMTP only** (**Settings → Password & Security → App Passwords**) — not your account password.
+3. Set `SMTP_USER` (your Fastmail login), `SMTP_PASSWORD` (the app password), and `NOTIFICATION_FROM_EMAIL` (the alias from step 1) in `api/.env`.
+
 ### 3. API (`api/`)
 
 ```sh
@@ -182,6 +201,9 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
    | `twitcher-api` | `ANTHROPIC_API_KEY` | same value as local `api/.env` |
    | `twitcher-api` | `SUPABASE_URL` | same value as local `api/.env` |
    | `twitcher-api` | `SUPABASE_SERVICE_ROLE_KEY` | same value as local `api/.env` |
+   | `twitcher-api` | `SMTP_USER` | same value as local `api/.env` |
+   | `twitcher-api` | `SMTP_PASSWORD` | same value as local `api/.env` |
+   | `twitcher-api` | `NOTIFICATION_FROM_EMAIL` | same value as local `api/.env` |
    | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
 
 3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireClerkAuth } from "../middleware/auth";
 import { requireAdmin } from "../middleware/admin";
 import { listAppUsers, updateAppUserStatus, type ApprovalStatus } from "../services/appUsers";
+import { listNotificationEmails, addNotificationEmail, removeNotificationEmail } from "../services/notificationEmails";
 
 export const adminRouter = Router();
 
@@ -30,3 +31,41 @@ adminRouter.patch("/admin/users/:clerkUserId", requireClerkAuth, requireAdmin, a
     next(error);
   }
 });
+
+adminRouter.get("/admin/notification-emails", requireClerkAuth, requireAdmin, async (_req, res, next) => {
+  try {
+    const emails = await listNotificationEmails();
+    res.json(emails);
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/admin/notification-emails", requireClerkAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (typeof email !== "string" || !email.includes("@")) {
+      res.status(400).json({ error: "A valid email is required." });
+      return;
+    }
+
+    await addNotificationEmail(email);
+    res.json(await listNotificationEmails());
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.delete(
+  "/admin/notification-emails/:email",
+  requireClerkAuth,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      await removeNotificationEmail(req.params.email as string);
+      res.json(await listNotificationEmails());
+    } catch (error) {
+      next(error);
+    }
+  },
+);
