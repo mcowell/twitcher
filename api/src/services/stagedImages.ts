@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { supabase } from "./supabase";
 import { identifyBird } from "./birdIdentification";
 import { saveIdentification } from "./identifications";
+import { computeCropRect, type Box } from "./imageCrop";
 
 const BUCKET = "staged-images";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -10,6 +12,19 @@ export interface StagedImageMetadata {
   camera?: string;
   eventId?: string;
   score?: number;
+  box?: Box;
+}
+
+// Best-effort — a crop failure (missing box, corrupt image, whatever) isn't
+// worth losing the detection over. Frigate's full frame is still useful
+// input for identification, just less ideal than a cropped one.
+async function cropToBox(imageBuffer: Buffer, box: Box): Promise<Buffer> {
+  const image = sharp(imageBuffer);
+  const { width, height } = await image.metadata();
+  if (!width || !height) throw new Error("Could not read image dimensions.");
+
+  const cropRect = computeCropRect(box, width, height);
+  return image.extract(cropRect).toBuffer();
 }
 
 export interface StagedImage extends StagedImageMetadata {
@@ -28,11 +43,20 @@ interface StagedImageRow {
 }
 
 export async function saveStagedImage(imageBuffer: Buffer, metadata: StagedImageMetadata): Promise<void> {
+  let finalBuffer = imageBuffer;
+  if (metadata.box) {
+    try {
+      finalBuffer = await cropToBox(imageBuffer, metadata.box);
+    } catch (error) {
+      console.error("Failed to crop staged image, storing the full frame instead:", error);
+    }
+  }
+
   const imagePath = `${randomUUID()}.jpg`;
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(imagePath, imageBuffer, { contentType: "image/jpeg" });
+    .upload(imagePath, finalBuffer, { contentType: "image/jpeg" });
   if (uploadError) throw uploadError;
 
   const { error: insertError } = await supabase.from("staged_images").insert({

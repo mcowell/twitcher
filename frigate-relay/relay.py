@@ -30,7 +30,7 @@ TOPIC = f"{TOPIC_PREFIX}/events"
 last_sent: dict[str, datetime] = {}
 
 
-def submit_for_staging(camera: str, event_id: str, score) -> None:
+def submit_for_staging(camera: str, event_id: str, score, box) -> None:
     # bbox=0 asks Frigate for the snapshot without its bounding-box overlay
     # burned in — a cleaner image for identification than the annotated
     # one Frigate's own review UI shows.
@@ -43,16 +43,22 @@ def submit_for_staging(camera: str, event_id: str, score) -> None:
         logger.exception("Failed to fetch snapshot for event %s", event_id)
         return
 
+    # The actual crop math lives on the API side, where it's testable —
+    # this just forwards Frigate's own box coordinates as-is.
+    data = {"camera": camera, "eventId": event_id, "score": score if score is not None else ""}
+    if box:
+        data["box"] = json.dumps(box)
+
     try:
         response = requests.post(
             f"{API_BASE_URL}/ingest/frigate",
             headers={"Authorization": f"Bearer {INGEST_SECRET}"},
             files={"image": ("snapshot.jpg", snapshot.content, "image/jpeg")},
-            data={"camera": camera, "eventId": event_id, "score": score if score is not None else ""},
+            data=data,
             timeout=20,
         )
         response.raise_for_status()
-        logger.info("STAGED camera=%s event=%s score=%s", camera, event_id, score)
+        logger.info("STAGED camera=%s event=%s score=%s box=%s", camera, event_id, score, box)
     except requests.RequestException:
         logger.exception("Failed to submit event %s to ingestion endpoint", event_id)
 
@@ -85,6 +91,7 @@ def on_message(client, userdata, msg):
     camera = event.get("camera", "unknown")
     event_id = event.get("id", "unknown")
     score = event.get("top_score") or event.get("score")
+    box = event.get("box")
     now = datetime.now()
 
     last = last_sent.get(camera)
@@ -100,7 +107,7 @@ def on_message(client, userdata, msg):
         return
 
     last_sent[camera] = now
-    submit_for_staging(camera, event_id, score)
+    submit_for_staging(camera, event_id, score, box)
 
 
 def main():
