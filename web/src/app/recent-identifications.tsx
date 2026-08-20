@@ -24,7 +24,7 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
 
     async function load() {
       const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/identifications?limit=3`, {
+      const response = await fetch(`${API_BASE_URL}/identifications?limit=4`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok || cancelled) return;
@@ -48,12 +48,12 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
           See all →
         </Link>
       </div>
-      <div className="flex gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {items.map((item) => (
           <Link
             key={item.id}
             href={`/history/${item.id}`}
-            className="w-48 shrink-0 rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1 hover:border-sky-300 transition-colors"
+            className="rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1 hover:border-sky-300 transition-colors"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
             <img
