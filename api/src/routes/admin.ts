@@ -3,6 +3,7 @@ import { requireClerkAuth } from "../middleware/auth";
 import { requireAdmin } from "../middleware/admin";
 import { listAppUsers, updateAppUserStatus, deleteAppUser, type ApprovalStatus } from "../services/appUsers";
 import { listNotificationEmails, addNotificationEmail, removeNotificationEmail } from "../services/notificationEmails";
+import { getStorageStats } from "../services/storageStats";
 
 export const adminRouter = Router();
 
@@ -83,3 +84,11 @@ adminRouter.delete(
     }
   },
 );
+
+adminRouter.get("/admin/storage-stats", requireClerkAuth, requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await getStorageStats());
+  } catch (error) {
+    next(error);
+  }
+});

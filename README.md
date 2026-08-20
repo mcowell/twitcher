@@ -48,11 +48,12 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Responsive layout — upload and results side by side on desktop, stacked on mobile
 - A small animated bird while Claude is thinking
 - Click the logo to reset and identify another bird
-- A "recently identified" strip showing your last 3 matches, thumbnail and all — "See all" leads to `/history`, every bird you've personally identified with a brief write-up per card and a full detail page (bigger image, full explanation, alternative possibilities) on click
+- A "recently identified" strip showing your last 4 matches, thumbnail and all — "See all" leads to `/history`, every bird you've personally identified with a brief write-up per card and a full detail page (bigger image, full explanation, alternative possibilities) on click
 - Public sign-up, but new accounts need manual approval before they can identify anything
 - Admins get emailed the moment a new account needs approval
 - A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
 - A full identification history at `/admin`, across every user, with bulk delete for database cleanup
+- A storage stat on `/admin` — image count and space used against Supabase's free-tier quota, so you can see it coming before it's a surprise
 
 ## Getting started
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminTable, type AppUser } from "./admin-table";
 import { NotificationEmails } from "./notification-emails";
+import { StorageStatsCard, type StorageStats } from "./storage-stats";
 import { ServiceUnavailable } from "../service-unavailable";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -13,12 +14,18 @@ export default async function AdminPage() {
 
   let usersResponse: Response;
   let emailsResponse: Response;
+  let storageResponse: Response;
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
-    [usersResponse, emailsResponse] = await Promise.all([
+    [usersResponse, emailsResponse, storageResponse] = await Promise.all([
       fetch(`${API_BASE_URL}/admin/users`, { headers, cache: "no-store", signal: AbortSignal.timeout(20_000) }),
       fetch(`${API_BASE_URL}/admin/notification-emails`, {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      }),
+      fetch(`${API_BASE_URL}/admin/storage-stats`, {
         headers,
         cache: "no-store",
         signal: AbortSignal.timeout(20_000),
@@ -36,10 +43,11 @@ export default async function AdminPage() {
     );
   }
 
-  if (!usersResponse.ok || !emailsResponse.ok) return <ServiceUnavailable />;
+  if (!usersResponse.ok || !emailsResponse.ok || !storageResponse.ok) return <ServiceUnavailable />;
 
   const users: AppUser[] = await usersResponse.json();
   const notificationEmails: string[] = await emailsResponse.json();
+  const storageStats: StorageStats = await storageResponse.json();
 
   return (
     <main className="flex-1 p-8 max-w-4xl mx-auto w-full flex flex-col gap-6">
@@ -54,6 +62,7 @@ export default async function AdminPage() {
           </Link>
         </div>
       </div>
+      <StorageStatsCard stats={storageStats} />
       <div>
         <AdminTable initialUsers={users} />
       </div>
