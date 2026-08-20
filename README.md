@@ -52,6 +52,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Public sign-up, but new accounts need manual approval before they can identify anything
 - Admins get emailed the moment a new account needs approval
 - A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
+- A full identification history at `/admin`, across every user, with bulk delete for database cleanup
 
 ## Getting started
 
@@ -167,6 +168,10 @@ Frigate (MQTT) → frigate-relay/ (your network) → POST /ingest/frigate → st
 - **`POST /ingest/frigate`** is authenticated with a static shared secret (`FRIGATE_INGEST_SECRET`), not a Clerk JWT — there's no human signing in on this path, just a script on your own network, so a session-based token doesn't apply (`api/src/middleware/ingestAuth.ts`, compared with `crypto.timingSafeEqual`). It stores the image in the `staged-images` bucket and a row in `staged_images` — no Claude call yet.
 - **`/admin/queue`** lists everything staged, with checkboxes (including "select all") for bulk actions: **Approve** runs identification on just the selected images and — for real bird sightings — saves them into the same `identifications` table as any other identification, attributed to whichever admin clicked Approve; **Delete** removes selected images without ever calling Claude, which is the point of the whole staging step — test/garbage detections can be cleared out for free.
 
+### Identification history
+
+The home page's "recently identified" strip only shows the last 3 — `/admin/history` is the full picture: every identification across every user (not just your own), paginated 30 at a time with a "Load more" button, each one showing who it's attributed to. Same multi-select-and-bulk-delete pattern as the Frigate queue, here for general database cleanup (e.g. a Frigate misfire that got approved by mistake) rather than pre-Claude triage. There's no automatic retention policy yet (delete-after-X-days or keep-last-X) — for now, cleanup is manual here.
+
 ### 3. API (`api/`)
 
 ```sh
@@ -262,8 +267,8 @@ twitcher/
 ## Possible next steps
 
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
-- A full history page, now that identifications are persisted — the home page only shows the last 3
 - Crop staged images to the bird's bounding box (with padding) before identification, rather than sending Frigate's full frame — cheaper per call and likely more accurate for small/distant birds, deferred from the initial ingestion build since it needs verified pixel-coordinate math against real Frigate data first
+- Automatic retention (delete identifications after X days, or beyond the most recent X) instead of only manual cleanup at `/admin/history`
 
 ---
 

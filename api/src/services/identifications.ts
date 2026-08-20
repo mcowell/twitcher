@@ -20,6 +20,10 @@ export interface StoredIdentification extends BirdIdentification {
   imageUrl: string;
 }
 
+export interface HistoryIdentification extends StoredIdentification {
+  email: string | null;
+}
+
 interface IdentificationRow {
   id: string;
   image_path: string;
@@ -31,6 +35,10 @@ interface IdentificationRow {
   description: string;
   alternative_possibilities: BirdIdentification["alternativePossibilities"];
   created_at: string;
+}
+
+interface IdentificationRowWithUser extends IdentificationRow {
+  app_users: { email: string | null } | null;
 }
 
 export async function saveIdentification(
@@ -114,4 +122,58 @@ export async function listRecentIdentifications(
     description: row.description,
     alternativePossibilities: row.alternative_possibilities,
   }));
+}
+
+// Admin-only view across every user's identifications (not just the
+// caller's own), for browsing/cleaning up history — e.g. bulk-approved
+// Frigate images. Paginated via limit/offset since this can grow
+// unbounded, unlike the home page's fixed "last 3" strip.
+export async function listAllIdentifications(limit: number, offset: number): Promise<HistoryIdentification[]> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("*, app_users(email)")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
+    .returns<IdentificationRowWithUser[]>();
+  if (error) throw error;
+  if (data.length === 0) return [];
+
+  const { data: signedUrls, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(
+      data.map((row) => row.image_path),
+      SIGNED_URL_TTL_SECONDS,
+    );
+  if (signError) throw signError;
+
+  return data.map((row, index) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    imageUrl: signedUrls[index]?.signedUrl ?? "",
+    isBird: row.is_bird,
+    isFictionalOrCostume: row.is_fictional_or_costume,
+    commonName: row.common_name,
+    scientificName: row.scientific_name,
+    confidence: row.confidence,
+    description: row.description,
+    alternativePossibilities: row.alternative_possibilities,
+    email: row.app_users?.email ?? null,
+  }));
+}
+
+export async function deleteIdentifications(ids: string[]): Promise<void> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("image_path")
+    .in("id", ids)
+    .returns<Pick<IdentificationRow, "image_path">[]>();
+  if (error) throw error;
+
+  if (data.length > 0) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove(data.map((row) => row.image_path));
+    if (removeError) throw removeError;
+  }
+
+  const { error: deleteError } = await supabase.from("identifications").delete().in("id", ids);
+  if (deleteError) throw deleteError;
 }

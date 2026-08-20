@@ -45,9 +45,14 @@ export default async function AdminPage() {
     <main className="flex-1 p-8 max-w-4xl mx-auto w-full flex flex-col gap-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Account approvals</h1>
-        <Link href="/admin/queue" className="text-sm font-medium text-sky-700 hover:underline">
-          Frigate review queue →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/history" className="text-sm font-medium text-sky-700 hover:underline">
+            Identification history →
+          </Link>
+          <Link href="/admin/queue" className="text-sm font-medium text-sky-700 hover:underline">
+            Frigate review queue →
+          </Link>
+        </div>
       </div>
       <div>
         <AdminTable initialUsers={users} />
