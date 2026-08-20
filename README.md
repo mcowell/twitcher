@@ -48,7 +48,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - Responsive layout — upload and results side by side on desktop, stacked on mobile
 - A small animated bird while Claude is thinking
 - Click the logo to reset and identify another bird
-- A "recently identified" strip showing your last 3 matches, thumbnail and all
+- A "recently identified" strip showing your last 3 matches, thumbnail and all — "See all" leads to `/history`, every bird you've personally identified with a brief write-up per card and a full detail page (bigger image, full explanation, alternative possibilities) on click
 - Public sign-up, but new accounts need manual approval before they can identify anything
 - Admins get emailed the moment a new account needs approval
 - A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
@@ -170,7 +170,12 @@ Frigate (MQTT) → frigate-relay/ (your network) → POST /ingest/frigate → st
 
 ### Identification history
 
-The home page's "recently identified" strip only shows the last 3 — `/admin/history` is the full picture: every identification across every user (not just your own), paginated 30 at a time with a "Load more" button, each one showing who it's attributed to. Same multi-select-and-bulk-delete pattern as the Frigate queue, here for general database cleanup (e.g. a Frigate misfire that got approved by mistake) rather than pre-Claude triage. There's no automatic retention policy yet (delete-after-X-days or keep-last-X) — for now, cleanup is manual here.
+The home page's "recently identified" strip only shows the last 3. Two fuller views build on the same paginated `limit`/`offset` pattern:
+
+- **`/history`** (any approved user) — everything *that user* has personally identified, browsable with "Load more" and a detail page per bird (`/history/[id]`, ownership-checked server-side so one user can't view another's by guessing an id) with the full write-up and alternative possibilities. Read-only — no delete.
+- **`/admin/history`** (admin-only) — every identification across *every* user, each one showing who it's attributed to, with the same multi-select-and-bulk-delete pattern as the Frigate queue, for general database cleanup (e.g. a Frigate misfire that got approved by mistake) rather than pre-Claude triage.
+
+There's no automatic retention policy yet (delete-after-X-days or keep-last-X) — for now, cleanup is manual at `/admin/history`.
 
 ### 3. API (`api/`)
 

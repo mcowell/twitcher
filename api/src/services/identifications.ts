@@ -91,13 +91,14 @@ export async function deleteAllForUser(clerkUserId: string): Promise<void> {
 export async function listRecentIdentifications(
   clerkUserId: string,
   limit: number,
+  offset = 0,
 ): Promise<StoredIdentification[]> {
   const { data, error } = await supabase
     .from("identifications")
     .select("*")
     .eq("clerk_user_id", clerkUserId)
     .order("created_at", { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
     .returns<IdentificationRow[]>();
   if (error) throw error;
   if (data.length === 0) return [];
@@ -122,6 +123,38 @@ export async function listRecentIdentifications(
     description: row.description,
     alternativePossibilities: row.alternative_possibilities,
   }));
+}
+
+// Ownership-checked single lookup for the detail view — filtering by both
+// id and clerk_user_id means a user can't view someone else's by guessing
+// an id, without needing a separate authorization check layered on top.
+export async function getIdentificationById(id: string, clerkUserId: string): Promise<StoredIdentification | null> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("*")
+    .eq("id", id)
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle<IdentificationRow>();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: signedUrlData, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+  if (signError) throw signError;
+
+  return {
+    id: data.id,
+    createdAt: data.created_at,
+    imageUrl: signedUrlData.signedUrl,
+    isBird: data.is_bird,
+    isFictionalOrCostume: data.is_fictional_or_costume,
+    commonName: data.common_name,
+    scientificName: data.scientific_name,
+    confidence: data.confidence,
+    description: data.description,
+    alternativePossibilities: data.alternative_possibilities,
+  };
 }
 
 // Admin-only view across every user's identifications (not just the

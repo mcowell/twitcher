@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 interface RecentIdentification {
@@ -41,12 +42,18 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
 
   return (
     <div className="w-full">
-      <p className="text-sm font-medium text-gray-500 mb-2">Recently identified</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-gray-500">Recently identified</p>
+        <Link href="/history" className="text-xs font-medium text-sky-700 hover:underline">
+          See all →
+        </Link>
+      </div>
       <div className="flex gap-3">
         {items.map((item) => (
-          <div
+          <Link
             key={item.id}
-            className="w-48 shrink-0 rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1"
+            href={`/history/${item.id}`}
+            className="w-48 shrink-0 rounded-2xl border border-sky-100 bg-white p-2 flex flex-col gap-1 hover:border-sky-300 transition-colors"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
             <img
@@ -58,7 +65,7 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
               {item.commonName}
               {item.isFictionalOrCostume && " 🎭"}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
