@@ -24,6 +24,8 @@ services:
         sync: false
       - key: NOTIFICATION_FROM_EMAIL
         sync: false
+      - key: FRIGATE_INGEST_SECRET
+        sync: false
       # Comma-separated. Used for both CORS and the JWT authorizedParties
       # check — value: https://twitcher.yourdomain.com (see README).
       - key: ALLOWED_ORIGINS

@@ -6,6 +6,10 @@
 .env.local
 .env*.local
 !.env.example
+# frigate-relay/env (missing the leading dot) has been created by mistake
+# before — Docker Compose won't auto-load it, but it's still a real secrets
+# file that deserves to never land in git.
+env
 
 # Dependencies / build output, in case anything ever lives outside web/ or api/
 node_modules/
@@ -15,6 +19,10 @@ dist/
 
 # Local Supabase CLI cache (created by `supabase projects`/`link` commands)
 supabase/.temp/
+
+# Python (frigate-relay/)
+__pycache__/
+*.pyc
 
 # OS cruft
 .DS_Store

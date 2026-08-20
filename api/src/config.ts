@@ -33,4 +33,8 @@ export const config = {
   smtpPassword: requireEnv("SMTP_PASSWORD"),
   // Must be an address/alias already verified as sendable in Fastmail.
   notificationFromEmail: requireEnv("NOTIFICATION_FROM_EMAIL"),
+  // Static shared secret for the Frigate ingestion route — there's no human
+  // signing in on that path, so a Clerk JWT doesn't apply. Scoped to only
+  // that one route (see requireIngestSecret).
+  frigateIngestSecret: requireEnv("FRIGATE_INGEST_SECRET"),
 };

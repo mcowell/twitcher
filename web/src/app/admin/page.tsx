@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AdminTable, type AppUser } from "./admin-table";
 import { NotificationEmails } from "./notification-emails";
 import { ServiceUnavailable } from "../service-unavailable";
@@ -42,8 +43,13 @@ export default async function AdminPage() {
 
   return (
     <main className="flex-1 p-8 max-w-4xl mx-auto w-full flex flex-col gap-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Account approvals</h1>
+        <Link href="/admin/queue" className="text-sm font-medium text-sky-700 hover:underline">
+          Frigate review queue →
+        </Link>
+      </div>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight mb-6">Account approvals</h1>
         <AdminTable initialUsers={users} />
       </div>
       <NotificationEmails initialEmails={notificationEmails} />

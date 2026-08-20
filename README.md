@@ -51,6 +51,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - A "recently identified" strip showing your last 3 matches, thumbnail and all
 - Public sign-up, but new accounts need manual approval before they can identify anything
 - Admins get emailed the moment a new account needs approval
+- A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
 
 ## Getting started
 
@@ -103,7 +104,21 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
   alter table identifications enable row level security;
   ```
 
-- And create a **private** Storage bucket named `bird-images` (Storage → New bucket, leave "Public bucket" off). Images are served to the browser via short-lived signed URLs generated server-side (`GET /identifications`), never a public bucket URL.
+- And this, for the Frigate review queue (see [Frigate ingestion](#frigate-ingestion) below):
+
+  ```sql
+  create table staged_images (
+    id uuid primary key default gen_random_uuid(),
+    image_path text not null,
+    camera text,
+    event_id text,
+    score numeric,
+    created_at timestamptz not null default now()
+  );
+  alter table staged_images enable row level security;
+  ```
+
+- And create two **private** Storage buckets: `bird-images` and `staged-images` (Storage → New bucket, leave "Public bucket" off both times). Images are served to the browser via short-lived signed URLs generated server-side, never a public bucket URL.
 - Grab the project URL and the **service-role key** (not the anon key) from **Settings → API**.
 - Approving accounts is done at **`/admin`** in the web app (see [Admin access](#admin-access) below) — the Supabase table editor still works as a fallback if you'd rather edit `app_users` rows directly.
 - Free tier auto-pauses a project after 7 days with no database activity — for an app used more than weekly this doesn't come up, but if it goes quiet, the next request just needs the project manually unpaused from the Supabase dashboard first.
@@ -137,6 +152,20 @@ Sending goes through **Fastmail's SMTP relay** (`smtp.fastmail.com:587`, via `no
 1. In Fastmail, add the address you want to send from as an alias (**Settings → Addresses**) if it isn't a full mailbox already — e.g. `notify@yourdomain.com`, kept separate from any real inbox.
 2. Generate an app password scoped to **Mail/SMTP only** (**Settings → Password & Security → App Passwords**) — not your account password.
 3. Set `SMTP_USER` (your Fastmail login), `SMTP_PASSWORD` (the app password), and `NOTIFICATION_FROM_EMAIL` (the alias from step 1) in `api/.env`.
+
+### Frigate ingestion
+
+A [Frigate](https://frigate.video) NVR watching a bird feeder can easily produce hundreds of detections a day, most of them the same few birds visiting repeatedly — sending every one to Claude would be wasteful and mostly redundant. So there's a staging step instead of a direct pipe to `/identify`:
+
+```
+Frigate (MQTT) → frigate-relay/ (your network) → POST /ingest/frigate → staged_images
+                                                                              │
+                                              /admin/queue (approve/delete) ─┘
+```
+
+- **`frigate-relay/`** is a standalone Python service — not part of `web`/`api`, meant to run on your own network (a Synology via Container Manager, in this project's case) rather than deployed alongside the rest of the app, since it needs local access to Frigate's MQTT broker and HTTP API. It subscribes to Frigate's `<topic_prefix>/events` MQTT topic, and for each finalized bird detection (`type: "end"`, `label: "bird"`) — after a per-camera cooldown (`COOLDOWN_MINUTES`, default 15) skips repeat visits from the same camera — fetches the snapshot with `?bbox=0` (Frigate's own bounding-box overlay stripped out, since a box drawn over the bird is worse input for identification than a clean photo) and POSTs it to `POST /ingest/frigate`. See `frigate-relay/README.md` for setup, including the dedicated read-scoped MQTT user this expects rather than reusing Frigate's own broker login.
+- **`POST /ingest/frigate`** is authenticated with a static shared secret (`FRIGATE_INGEST_SECRET`), not a Clerk JWT — there's no human signing in on this path, just a script on your own network, so a session-based token doesn't apply (`api/src/middleware/ingestAuth.ts`, compared with `crypto.timingSafeEqual`). It stores the image in the `staged-images` bucket and a row in `staged_images` — no Claude call yet.
+- **`/admin/queue`** lists everything staged, with checkboxes (including "select all") for bulk actions: **Approve** runs identification on just the selected images and — for real bird sightings — saves them into the same `identifications` table as any other identification, attributed to whichever admin clicked Approve; **Delete** removes selected images without ever calling Claude, which is the point of the whole staging step — test/garbage detections can be cleared out for free.
 
 ### 3. API (`api/`)
 
@@ -204,6 +233,7 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
    | `twitcher-api` | `SMTP_USER` | same value as local `api/.env` |
    | `twitcher-api` | `SMTP_PASSWORD` | same value as local `api/.env` |
    | `twitcher-api` | `NOTIFICATION_FROM_EMAIL` | same value as local `api/.env` |
+   | `twitcher-api` | `FRIGATE_INGEST_SECRET` | same value as local `api/.env` (and `frigate-relay`'s `INGEST_SECRET`) |
    | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
 
 3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).
@@ -224,15 +254,16 @@ The model is `claude-opus-5`. It started out on `claude-haiku-4-5` — the cheap
 
 ```
 twitcher/
-├── web/     Next.js frontend (Clerk auth, upload UI)
-└── api/     Express API (JWT verification, Claude calls)
+├── web/            Next.js frontend (Clerk auth, upload UI)
+├── api/            Express API (JWT verification, Claude calls, Frigate ingestion)
+└── frigate-relay/  Standalone Python service — runs on your own network, not deployed with the rest
 ```
 
 ## Possible next steps
 
-- A machine-to-machine ingestion route (e.g. for a security camera / NVR like Frigate to submit snapshots automatically) — that'd use a separate static-secret check rather than Clerk JWTs, since there's no human signing in
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
 - A full history page, now that identifications are persisted — the home page only shows the last 3
+- Crop staged images to the bird's bounding box (with padding) before identification, rather than sending Frigate's full frame — cheaper per call and likely more accurate for small/distant birds, deferred from the initial ingestion build since it needs verified pixel-coordinate math against real Frigate data first
 
 ---
 

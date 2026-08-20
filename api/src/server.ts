@@ -5,6 +5,8 @@ import { identifyRouter } from "./routes/identify";
 import { meRouter } from "./routes/me";
 import { adminRouter } from "./routes/admin";
 import { identificationsRouter } from "./routes/identifications";
+import { ingestRouter } from "./routes/ingest";
+import { queueRouter } from "./routes/queue";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -29,6 +31,8 @@ app.use("/", identifyRouter);
 app.use("/", meRouter);
 app.use("/", adminRouter);
 app.use("/", identificationsRouter);
+app.use("/", ingestRouter);
+app.use("/", queueRouter);
 
 app.use(errorHandler);
 
