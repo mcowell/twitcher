@@ -71,6 +71,7 @@ export function HistoryList({
             <img
               src={item.imageUrl}
               alt={item.commonName}
+              loading="lazy"
               className="w-full aspect-square object-cover rounded-lg"
             />
             <div className="flex items-center justify-between gap-1">

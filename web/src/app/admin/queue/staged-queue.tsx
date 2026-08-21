@@ -145,7 +145,12 @@ export function StagedQueue({ initialImages }: { initialImages: StagedImage[] })
               className="absolute top-3 left-3 h-4 w-4 z-10"
             />
             {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
-            <img src={image.imageUrl} alt="Staged bird" className="w-full aspect-square object-cover rounded-lg" />
+            <img
+              src={image.imageUrl}
+              alt="Staged bird"
+              loading="lazy"
+              className="w-full aspect-square object-cover rounded-lg"
+            />
             <p className="text-xs text-gray-500 truncate">{image.camera ?? "unknown camera"}</p>
             {image.score !== undefined && (
               <p className="text-xs text-gray-400">score {Math.round(image.score * 100) / 100}</p>

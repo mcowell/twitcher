@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { supabase } from "./supabase";
 import type { BirdIdentification, SupportedImageMimeType } from "./birdIdentification";
 
@@ -6,6 +7,14 @@ const BUCKET = "bird-images";
 // Long enough to cover a page view, short enough that a copied link goes
 // stale quickly rather than becoming a durable, unauthenticated image URL.
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+// The public copy is what /community actually serves, to potentially
+// anyone — private originals can stay full-resolution (only the owner/an
+// admin ever loads those), but a 30-image public grid downloading full
+// multi-megabyte photos is exactly what makes that page slow. Capped to
+// this on the longer side, never upscaled if the original's smaller.
+const PUBLIC_IMAGE_MAX_DIMENSION = 1000;
+const PUBLIC_IMAGE_QUALITY = 82;
 
 const EXTENSIONS: Record<SupportedImageMimeType, string> = {
   "image/jpeg": "jpg",
@@ -199,10 +208,27 @@ async function applyPublicSharingChange(
   if (isPublic) {
     if (row.public_image_path) return { is_public: true, public_image_path: row.public_image_path };
 
-    const ext = row.image_path.split(".").pop();
-    const publicPath = `public/${randomUUID()}.${ext}`;
-    const { error: copyError } = await supabase.storage.from(BUCKET).copy(row.image_path, publicPath);
-    if (copyError) throw copyError;
+    const { data: original, error: downloadError } = await supabase.storage.from(BUCKET).download(row.image_path);
+    if (downloadError) throw downloadError;
+
+    const resized = await sharp(Buffer.from(await original.arrayBuffer()))
+      .resize({
+        width: PUBLIC_IMAGE_MAX_DIMENSION,
+        height: PUBLIC_IMAGE_MAX_DIMENSION,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: PUBLIC_IMAGE_QUALITY })
+      .toBuffer();
+
+    // Always .jpg regardless of the original's format — re-encoding to a
+    // consistent format is a side effect of resizing through sharp anyway.
+    const publicPath = `public/${randomUUID()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(publicPath, resized, { contentType: "image/jpeg" });
+    if (uploadError) throw uploadError;
+
     return { is_public: true, public_image_path: publicPath };
   }
 

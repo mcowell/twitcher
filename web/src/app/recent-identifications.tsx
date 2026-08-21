@@ -59,6 +59,7 @@ export function RecentIdentifications({ refreshKey }: { refreshKey: number }) {
             <img
               src={item.imageUrl}
               alt={item.commonName}
+              loading="lazy"
               className="w-full aspect-square object-cover rounded-lg"
             />
             <p className="text-xs font-medium truncate">
