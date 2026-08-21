@@ -34,7 +34,7 @@ This is deliberately **two separately deployable services**, not a single full-s
                                          └──────────────┘                      └───────────┘
 ```
 
-- **`web/`** — the Next.js frontend. Clerk gates every page (`auth.protect()`), and the browser fetches a short-lived Clerk session token (`useAuth().getToken()`) to send with each request. `/` also does a server-side `GET /me` call to decide whether to show the splash, the pending-approval screen, or the app itself.
+- **`web/`** — the Next.js frontend. Most pages require a signed-in, approved account, and the browser fetches a short-lived Clerk session token (`useAuth().getToken()`) to send with each request. `/` does a server-side `GET /me` call to decide whether to show the splash, the pending-approval screen, or the app itself. `/community` is the one deliberate exception — fully public, no token sent or required (see [Community sharing](#community-sharing)).
 - **`api/`** — a standalone Express API with zero dependency on Next.js or Clerk's frontend SDK. It verifies the incoming JWT itself, via the framework-agnostic `@clerk/backend` package, before calling Claude. Because it only cares about "is this a validly-signed token," it isn't tied to the Next.js login flow — any client that can present a valid JWT can call it.
 - **Supabase** sits entirely behind `api/`, accessed only with the service-role key — the browser and `web/` never talk to it directly, and there's no Postgres RLS in play. It's the system of record for account approval today (`app_users` table), and the natural place to store per-identification results later (see [Possible next steps](#possible-next-steps)).
 - CORS on the API is locked to known frontend origins, but **CORS isn't the security boundary** — token verification is. A non-browser client ignores CORS entirely; what actually stops unauthenticated use is `verifyToken()` rejecting the request.
@@ -54,7 +54,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
 - A full identification history at `/admin`, across every user, with bulk delete for database cleanup
 - A storage stat on `/admin` — image count and space used against Supabase's free-tier quota, so you can see it coming before it's a surprise
-- Opt-in public sharing: mark any of your identifications shareable from its detail page, and it shows up at `/community` for other signed-in users to browse
+- Opt-in public sharing: mark any of your identifications shareable from its detail page, and it shows up at `/community` — public, no account needed to view it
 
 ## Getting started
 
@@ -102,7 +102,8 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
     description text not null,
     alternative_possibilities jsonb not null default '[]'::jsonb,
     created_at timestamptz not null default now(),
-    is_public boolean not null default false
+    is_public boolean not null default false,
+    public_image_path text
   );
   create index identifications_clerk_user_id_created_at_idx on identifications (clerk_user_id, created_at desc);
   alter table identifications enable row level security;
@@ -182,9 +183,9 @@ There's no automatic retention policy yet (delete-after-X-days or keep-last-X) �
 
 ### Community sharing
 
-`/history/[id]` has a "Share publicly" toggle (`PATCH /identifications/:id/share`, ownership-checked the same way as the rest of `/history` — verified directly that a non-owner can't flip someone else's sharing status before wiring this into the UI). Shared identifications show up at `/community` and `/community/[id]` for any signed-in user to browse — a separate `PublicIdentification` type deliberately excludes anything identifying the uploader (no email, no attribution) from that response.
+`/history/[id]` (and, with an admin override, `/admin/history/[id]`) has a "Share publicly" toggle (`PATCH /identifications/:id/share`, ownership-checked the same way as the rest of `/history`). Shared identifications show up at **`/community`** and `/community/[id]` — fully public routes with no auth at all, reachable by anyone, signed in or not (there's a "View Community" button next to Sign up on the splash page for signed-out visitors). A separate `PublicIdentification` type deliberately excludes anything identifying the uploader (no email, no attribution) from that response.
 
-That's intentional groundwork: `/community` is gated behind sign-in for now, but designed so it can become a public, unauthenticated route later just by dropping `requireClerkAuth`/`requireApproval` from `api/src/routes/community.ts`, without needing new privacy work at that point — with one known exception. The signed image URL's storage path currently embeds the uploader's raw Clerk user ID (`bird-images/<clerk_user_id>/...`), which is visible in the URL string returned for a public share. That's an opaque token, not a name or email, but it does let someone tell that two public shares came from the same account. Worth closing (e.g. copying the image to a user-id-free path when it's shared) before `/community` actually goes fully public — left as-is for now since it's a minor gap and the page isn't reachable without an account yet anyway.
+Sharing an image doesn't just flip a flag — it **copies the image to a separate, user-id-free storage path** (`public/<uuid>.<ext>`, tracked in a `public_image_path` column) via Supabase Storage's `copy()`, and `/community`'s routes only ever generate signed URLs from that copy, never from the original `image_path` (which embeds the owner's Clerk user ID in its folder structure, fine for a signed URL only the owner or an admin ever sees, but not for one handed to anonymous internet visitors). Unsharing deletes that public copy; deleting an identification entirely cleans up both copies if a public one exists. This was verified directly against real data — including backfilling the public copy for identifications that had already been shared before this mechanism existed — before making `/community` reachable without an account.
 
 ### 3. API (`api/`)
 
@@ -282,7 +283,6 @@ twitcher/
 
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
 - Automatic retention (delete identifications after X days, or beyond the most recent X) instead of only manual cleanup at `/admin/history`
-- Make `/community` actually public (drop its auth middleware) — first close the storage-path user-id leak described in [Community sharing](#community-sharing)
 
 ---
 

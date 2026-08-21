@@ -46,6 +46,7 @@ interface IdentificationRow {
   alternative_possibilities: BirdIdentification["alternativePossibilities"];
   created_at: string;
   is_public: boolean;
+  public_image_path: string | null;
 }
 
 interface IdentificationRowWithUser extends IdentificationRow {
@@ -79,19 +80,34 @@ export async function saveIdentification(
   if (insertError) throw insertError;
 }
 
+type PathRow = Pick<IdentificationRow, "image_path" | "public_image_path">;
+
+// Rows carry both their private path and, if ever shared, a separate
+// public copy — deleting an identification has to clean up whichever of
+// the two actually exist, not just image_path.
+function collectStoragePaths(rows: PathRow[]): string[] {
+  const paths: string[] = [];
+  for (const row of rows) {
+    paths.push(row.image_path);
+    if (row.public_image_path) paths.push(row.public_image_path);
+  }
+  return paths;
+}
+
 // Identifications carry a foreign key to app_users, so this has to run
 // before an app_users row can be deleted — storage objects aren't covered
 // by that constraint and would otherwise be orphaned.
 export async function deleteAllForUser(clerkUserId: string): Promise<void> {
   const { data, error } = await supabase
     .from("identifications")
-    .select("image_path")
+    .select("image_path, public_image_path")
     .eq("clerk_user_id", clerkUserId)
-    .returns<Pick<IdentificationRow, "image_path">[]>();
+    .returns<PathRow[]>();
   if (error) throw error;
 
-  if (data.length > 0) {
-    const { error: removeError } = await supabase.storage.from(BUCKET).remove(data.map((row) => row.image_path));
+  const paths = collectStoragePaths(data);
+  if (paths.length > 0) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove(paths);
     if (removeError) throw removeError;
   }
 
@@ -170,6 +186,33 @@ export async function getIdentificationById(id: string, clerkUserId: string): Pr
   };
 }
 
+// image_path embeds the owner's clerk_user_id (e.g. "user_.../<uuid>.jpg"),
+// which is fine for a signed URL only the owner or an admin ever sees — but
+// a publicly-shared identification's URL is handed to anyone, including
+// signed-out visitors once /community goes public. So sharing copies the
+// image to a path with no user-id in it at all, and unsharing removes that
+// copy again, rather than ever generating a public URL from image_path.
+async function applyPublicSharingChange(
+  row: IdentificationRow,
+  isPublic: boolean,
+): Promise<{ is_public: boolean; public_image_path: string | null }> {
+  if (isPublic) {
+    if (row.public_image_path) return { is_public: true, public_image_path: row.public_image_path };
+
+    const ext = row.image_path.split(".").pop();
+    const publicPath = `public/${randomUUID()}.${ext}`;
+    const { error: copyError } = await supabase.storage.from(BUCKET).copy(row.image_path, publicPath);
+    if (copyError) throw copyError;
+    return { is_public: true, public_image_path: publicPath };
+  }
+
+  if (row.public_image_path) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove([row.public_image_path]);
+    if (removeError) throw removeError;
+  }
+  return { is_public: false, public_image_path: null };
+}
+
 // Ownership-checked — only the person who owns an identification can flip
 // its sharing status. Returns null (rather than throwing) when the id
 // doesn't exist or isn't owned by this caller, same shape as a "not found".
@@ -178,15 +221,24 @@ export async function setIdentificationPublic(
   clerkUserId: string,
   isPublic: boolean,
 ): Promise<StoredIdentification | null> {
-  const { data, error } = await supabase
+  const { data: existing, error: fetchError } = await supabase
     .from("identifications")
-    .update({ is_public: isPublic })
+    .select("*")
     .eq("id", id)
     .eq("clerk_user_id", clerkUserId)
-    .select()
     .maybeSingle<IdentificationRow>();
+  if (fetchError) throw fetchError;
+  if (!existing) return null;
+
+  const changes = await applyPublicSharingChange(existing, isPublic);
+
+  const { data, error } = await supabase
+    .from("identifications")
+    .update(changes)
+    .eq("id", id)
+    .select()
+    .single<IdentificationRow>();
   if (error) throw error;
-  if (!data) return null;
 
   const { data: signedUrlData, error: signError } = await supabase.storage
     .from(BUCKET)
@@ -213,16 +265,19 @@ export async function listPublicIdentifications(limit: number, offset: number): 
     .from("identifications")
     .select("*")
     .eq("is_public", true)
+    .not("public_image_path", "is", null)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1)
     .returns<IdentificationRow[]>();
   if (error) throw error;
   if (data.length === 0) return [];
 
+  // Always public_image_path here, never image_path — that's the whole
+  // point of the copy-on-share step above.
   const { data: signedUrls, error: signError } = await supabase.storage
     .from(BUCKET)
     .createSignedUrls(
-      data.map((row) => row.image_path),
+      data.map((row) => row.public_image_path as string),
       SIGNED_URL_TTL_SECONDS,
     );
   if (signError) throw signError;
@@ -252,11 +307,11 @@ export async function getPublicIdentificationById(id: string): Promise<PublicIde
     .eq("is_public", true)
     .maybeSingle<IdentificationRow>();
   if (error) throw error;
-  if (!data) return null;
+  if (!data || !data.public_image_path) return null;
 
   const { data: signedUrlData, error: signError } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(data.public_image_path, SIGNED_URL_TTL_SECONDS);
   if (signError) throw signError;
 
   return {
@@ -339,14 +394,23 @@ export async function getAnyIdentificationById(id: string): Promise<HistoryIdent
 // visible regardless of who originally uploaded it (e.g. sharing a good
 // Frigate catch that got approved under someone else's account).
 export async function setAnyIdentificationPublic(id: string, isPublic: boolean): Promise<HistoryIdentification | null> {
+  const { data: existing, error: fetchError } = await supabase
+    .from("identifications")
+    .select("*, app_users(email)")
+    .eq("id", id)
+    .maybeSingle<IdentificationRowWithUser>();
+  if (fetchError) throw fetchError;
+  if (!existing) return null;
+
+  const changes = await applyPublicSharingChange(existing, isPublic);
+
   const { data, error } = await supabase
     .from("identifications")
-    .update({ is_public: isPublic })
+    .update(changes)
     .eq("id", id)
     .select("*, app_users(email)")
-    .maybeSingle<IdentificationRowWithUser>();
+    .single<IdentificationRowWithUser>();
   if (error) throw error;
-  if (!data) return null;
 
   const { data: signedUrlData, error: signError } = await supabase.storage
     .from(BUCKET)
@@ -359,13 +423,14 @@ export async function setAnyIdentificationPublic(id: string, isPublic: boolean):
 export async function deleteIdentifications(ids: string[]): Promise<void> {
   const { data, error } = await supabase
     .from("identifications")
-    .select("image_path")
+    .select("image_path, public_image_path")
     .in("id", ids)
-    .returns<Pick<IdentificationRow, "image_path">[]>();
+    .returns<PathRow[]>();
   if (error) throw error;
 
-  if (data.length > 0) {
-    const { error: removeError } = await supabase.storage.from(BUCKET).remove(data.map((row) => row.image_path));
+  const paths = collectStoragePaths(data);
+  if (paths.length > 0) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove(paths);
     if (removeError) throw removeError;
   }
 

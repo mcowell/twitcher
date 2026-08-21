@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SignUpButton } from "@clerk/nextjs";
 
 // Shown at "/" to signed-out visitors instead of bouncing them straight to
@@ -16,14 +17,22 @@ export function Splash() {
         Upload a photo of a bird and Claude tells you what it is — species, confidence,
         and a couple of alternatives if it&apos;s not sure.
       </p>
-      <SignUpButton>
-        <button
-          type="button"
-          className="rounded-full bg-sky-600 text-white px-6 py-3 text-base font-medium hover:bg-sky-700 transition-colors cursor-pointer"
+      <div className="flex items-center gap-3">
+        <SignUpButton>
+          <button
+            type="button"
+            className="rounded-full bg-sky-600 text-white px-6 py-3 text-base font-medium hover:bg-sky-700 transition-colors cursor-pointer"
+          >
+            Sign up
+          </button>
+        </SignUpButton>
+        <Link
+          href="/community"
+          className="rounded-full border border-sky-600 text-sky-700 px-6 py-3 text-base font-medium hover:bg-sky-50 transition-colors"
         >
-          Sign up
-        </button>
-      </SignUpButton>
+          View Community
+        </Link>
+      </div>
       <p className="text-sm text-gray-400">
         New accounts need approval before they can start identifying birds.
       </p>

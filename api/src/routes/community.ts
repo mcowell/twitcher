@@ -1,6 +1,4 @@
 import { Router } from "express";
-import { requireClerkAuth } from "../middleware/auth";
-import { requireApproval } from "../middleware/approval";
 import { listPublicIdentifications, getPublicIdentificationById } from "../services/identifications";
 
 export const communityRouter = Router();
@@ -8,12 +6,14 @@ export const communityRouter = Router();
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
 
-// Gated behind sign-in + approval for now, same as everything else — but
-// deliberately kept separate from the rest of /identifications and never
-// includes uploader identity (see PublicIdentification), specifically so
-// this can become a public, unauthenticated route later just by dropping
-// the two middlewares below, with no further privacy work needed.
-communityRouter.get("/community", requireClerkAuth, requireApproval, async (req, res, next) => {
+// Deliberately public, no auth at all — reachable by anyone, signed in or
+// not. Kept in its own file, separate from the rest of /identifications,
+// and PublicIdentification never includes uploader identity; sharing
+// itself also copies the image to a user-id-free storage path (see
+// applyPublicSharingChange in identifications.ts) specifically so this
+// route being fully open doesn't leak anything beyond what the owner
+// explicitly chose to share.
+communityRouter.get("/community", async (req, res, next) => {
   try {
     const requested = Number(req.query.limit);
     const limit = Number.isInteger(requested) ? Math.min(Math.max(requested, 1), MAX_LIMIT) : DEFAULT_LIMIT;
@@ -28,7 +28,7 @@ communityRouter.get("/community", requireClerkAuth, requireApproval, async (req,
   }
 });
 
-communityRouter.get("/community/:id", requireClerkAuth, requireApproval, async (req, res, next) => {
+communityRouter.get("/community/:id", async (req, res, next) => {
   try {
     const identification = await getPublicIdentificationById(req.params.id as string);
     if (!identification) {

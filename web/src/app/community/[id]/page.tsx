@@ -1,5 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ServiceUnavailable } from "../../service-unavailable";
 
@@ -25,14 +24,10 @@ const CONFIDENCE_STYLES: Record<CommunityIdentificationDetail["confidence"], str
 
 export default async function CommunityIdentificationDetailPage(props: PageProps<"/community/[id]">) {
   const { id } = await props.params;
-  const { userId, getToken } = await auth();
-  if (!userId) redirect("/");
 
   let response: Response;
   try {
-    const token = await getToken();
     response = await fetch(`${API_BASE_URL}/community/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
     });

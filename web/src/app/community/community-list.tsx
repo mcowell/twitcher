@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
 
 export interface CommunityIdentification {
   id: string;
@@ -29,7 +28,6 @@ export function CommunityList({
   initialIdentifications: CommunityIdentification[];
   pageSize: number;
 }) {
-  const { getToken } = useAuth();
   const [items, setItems] = useState(initialIdentifications);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialIdentifications.length === pageSize);
@@ -39,10 +37,7 @@ export function CommunityList({
     setLoadingMore(true);
     setError(null);
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/community?limit=${pageSize}&offset=${items.length}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`${API_BASE_URL}/community?limit=${pageSize}&offset=${items.length}`);
       if (!response.ok) throw new Error("Failed to load more.");
       const more: CommunityIdentification[] = await response.json();
       setItems((current) => [...current, ...more]);
