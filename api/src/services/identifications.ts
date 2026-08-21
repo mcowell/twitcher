@@ -212,6 +212,11 @@ async function applyPublicSharingChange(
     if (downloadError) throw downloadError;
 
     const resized = await sharp(Buffer.from(await original.arrayBuffer()))
+      // Many phone photos store a "rotate this for display" EXIF tag rather
+      // than rotating the actual pixels — browsers respect it automatically,
+      // but re-encoding through sharp without this would silently drop the
+      // tag and keep the raw, unrotated pixel data.
+      .autoOrient()
       .resize({
         width: PUBLIC_IMAGE_MAX_DIMENSION,
         height: PUBLIC_IMAGE_MAX_DIMENSION,
