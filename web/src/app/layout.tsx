@@ -34,44 +34,30 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-gradient-to-b from-sky-50 to-white text-gray-900">
         <ClerkProvider>
           <ResetProvider>
-            <header className="flex items-center justify-between gap-3 px-6 py-4 bg-gradient-to-r from-sky-600 to-sky-800">
-              <HeaderLogo />
-              <Show when="signed-out">
-                <div className="flex items-center gap-2">
-                  <SignInButton>
-                    <button
-                      type="button"
-                      className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors cursor-pointer"
-                    >
-                      Login
-                    </button>
-                  </SignInButton>
-                  <SignUpButton>
-                    <button
-                      type="button"
-                      className="rounded-full bg-white text-sky-700 px-4 py-1.5 text-sm font-medium hover:bg-sky-50 transition-colors cursor-pointer"
-                    >
-                      Sign up
-                    </button>
-                  </SignUpButton>
-                </div>
-              </Show>
-              <Show when="signed-in">
-                <div className="flex items-center gap-3">
-                  <Link
-                    href="/community"
-                    className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
-                  >
-                    Community
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
-                    >
-                      Admin
-                    </Link>
-                  )}
+            <header className="flex flex-col gap-2 px-6 py-4 bg-gradient-to-r from-sky-600 to-sky-800">
+              <div className="flex items-center justify-between gap-3">
+                <HeaderLogo />
+                <Show when="signed-out">
+                  <div className="flex items-center gap-2">
+                    <SignInButton>
+                      <button
+                        type="button"
+                        className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        Login
+                      </button>
+                    </SignInButton>
+                    <SignUpButton>
+                      <button
+                        type="button"
+                        className="rounded-full bg-white text-sky-700 px-4 py-1.5 text-sm font-medium hover:bg-sky-50 transition-colors cursor-pointer"
+                      >
+                        Sign up
+                      </button>
+                    </SignUpButton>
+                  </div>
+                </Show>
+                <Show when="signed-in">
                   <UserButton
                     showName
                     appearance={{
@@ -86,6 +72,24 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                       },
                     }}
                   />
+                </Show>
+              </div>
+              <Show when="signed-in">
+                <div className="flex items-center justify-end gap-4">
+                  <Link
+                    href="/community"
+                    className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                  >
+                    Community
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="rounded-full px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                    >
+                      Admin
+                    </Link>
+                  )}
                 </div>
               </Show>
             </header>
