@@ -18,10 +18,20 @@ export interface StoredIdentification extends BirdIdentification {
   id: string;
   createdAt: string;
   imageUrl: string;
+  isPublic: boolean;
 }
 
 export interface HistoryIdentification extends StoredIdentification {
   email: string | null;
+}
+
+// Deliberately excludes anything identifying the uploader — this listing is
+// meant to eventually be reachable without being signed in at all, so it's
+// designed privacy-safe from the start rather than needing redaction later.
+export interface PublicIdentification extends BirdIdentification {
+  id: string;
+  createdAt: string;
+  imageUrl: string;
 }
 
 interface IdentificationRow {
@@ -35,6 +45,7 @@ interface IdentificationRow {
   description: string;
   alternative_possibilities: BirdIdentification["alternativePossibilities"];
   created_at: string;
+  is_public: boolean;
 }
 
 interface IdentificationRowWithUser extends IdentificationRow {
@@ -122,6 +133,7 @@ export async function listRecentIdentifications(
     confidence: row.confidence,
     description: row.description,
     alternativePossibilities: row.alternative_possibilities,
+    isPublic: row.is_public,
   }));
 }
 
@@ -134,6 +146,110 @@ export async function getIdentificationById(id: string, clerkUserId: string): Pr
     .select("*")
     .eq("id", id)
     .eq("clerk_user_id", clerkUserId)
+    .maybeSingle<IdentificationRow>();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: signedUrlData, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+  if (signError) throw signError;
+
+  return {
+    id: data.id,
+    createdAt: data.created_at,
+    imageUrl: signedUrlData.signedUrl,
+    isBird: data.is_bird,
+    isFictionalOrCostume: data.is_fictional_or_costume,
+    commonName: data.common_name,
+    scientificName: data.scientific_name,
+    confidence: data.confidence,
+    description: data.description,
+    alternativePossibilities: data.alternative_possibilities,
+    isPublic: data.is_public,
+  };
+}
+
+// Ownership-checked — only the person who owns an identification can flip
+// its sharing status. Returns null (rather than throwing) when the id
+// doesn't exist or isn't owned by this caller, same shape as a "not found".
+export async function setIdentificationPublic(
+  id: string,
+  clerkUserId: string,
+  isPublic: boolean,
+): Promise<StoredIdentification | null> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .update({ is_public: isPublic })
+    .eq("id", id)
+    .eq("clerk_user_id", clerkUserId)
+    .select()
+    .maybeSingle<IdentificationRow>();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: signedUrlData, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+  if (signError) throw signError;
+
+  return {
+    id: data.id,
+    createdAt: data.created_at,
+    imageUrl: signedUrlData.signedUrl,
+    isBird: data.is_bird,
+    isFictionalOrCostume: data.is_fictional_or_costume,
+    commonName: data.common_name,
+    scientificName: data.scientific_name,
+    confidence: data.confidence,
+    description: data.description,
+    alternativePossibilities: data.alternative_possibilities,
+    isPublic: data.is_public,
+  };
+}
+
+export async function listPublicIdentifications(limit: number, offset: number): Promise<PublicIdentification[]> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("*")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
+    .returns<IdentificationRow[]>();
+  if (error) throw error;
+  if (data.length === 0) return [];
+
+  const { data: signedUrls, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(
+      data.map((row) => row.image_path),
+      SIGNED_URL_TTL_SECONDS,
+    );
+  if (signError) throw signError;
+
+  return data.map((row, index) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    imageUrl: signedUrls[index]?.signedUrl ?? "",
+    isBird: row.is_bird,
+    isFictionalOrCostume: row.is_fictional_or_costume,
+    commonName: row.common_name,
+    scientificName: row.scientific_name,
+    confidence: row.confidence,
+    description: row.description,
+    alternativePossibilities: row.alternative_possibilities,
+  }));
+}
+
+// Not ownership-checked (unlike getIdentificationById) — any signed-in user
+// can view any publicly-shared identification, not just their own. Still
+// filters on is_public so an id someone stopped sharing 404s immediately.
+export async function getPublicIdentificationById(id: string): Promise<PublicIdentification | null> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("*")
+    .eq("id", id)
+    .eq("is_public", true)
     .maybeSingle<IdentificationRow>();
   if (error) throw error;
   if (!data) return null;
@@ -190,6 +306,7 @@ export async function listAllIdentifications(limit: number, offset: number): Pro
     confidence: row.confidence,
     description: row.description,
     alternativePossibilities: row.alternative_possibilities,
+    isPublic: row.is_public,
     email: row.app_users?.email ?? null,
   }));
 }

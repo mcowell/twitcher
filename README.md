@@ -54,6 +54,7 @@ This is deliberately **two separately deployable services**, not a single full-s
 - A Frigate NVR integration for bird-feeder cameras: detections land in a review queue instead of being auto-identified, so you approve (or bulk-delete test/garbage) what actually gets sent to Claude
 - A full identification history at `/admin`, across every user, with bulk delete for database cleanup
 - A storage stat on `/admin` — image count and space used against Supabase's free-tier quota, so you can see it coming before it's a surprise
+- Opt-in public sharing: mark any of your identifications shareable from its detail page, and it shows up at `/community` for other signed-in users to browse
 
 ## Getting started
 
@@ -100,7 +101,8 @@ Prerequisites: Node.js, an [Anthropic API key](https://console.anthropic.com/set
     confidence text not null check (confidence in ('low', 'medium', 'high')),
     description text not null,
     alternative_possibilities jsonb not null default '[]'::jsonb,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    is_public boolean not null default false
   );
   create index identifications_clerk_user_id_created_at_idx on identifications (clerk_user_id, created_at desc);
   alter table identifications enable row level security;
@@ -171,12 +173,18 @@ Frigate (MQTT) → frigate-relay/ (your network) → POST /ingest/frigate → st
 
 ### Identification history
 
-The home page's "recently identified" strip only shows the last 3. Two fuller views build on the same paginated `limit`/`offset` pattern:
+The home page's "recently identified" strip only shows the last 4. Two fuller views build on the same paginated `limit`/`offset` pattern:
 
 - **`/history`** (any approved user) — everything *that user* has personally identified, browsable with "Load more" and a detail page per bird (`/history/[id]`, ownership-checked server-side so one user can't view another's by guessing an id) with the full write-up and alternative possibilities. Read-only — no delete.
 - **`/admin/history`** (admin-only) — every identification across *every* user, each one showing who it's attributed to, with the same multi-select-and-bulk-delete pattern as the Frigate queue, for general database cleanup (e.g. a Frigate misfire that got approved by mistake) rather than pre-Claude triage.
 
 There's no automatic retention policy yet (delete-after-X-days or keep-last-X) — for now, cleanup is manual at `/admin/history`.
+
+### Community sharing
+
+`/history/[id]` has a "Share publicly" toggle (`PATCH /identifications/:id/share`, ownership-checked the same way as the rest of `/history` — verified directly that a non-owner can't flip someone else's sharing status before wiring this into the UI). Shared identifications show up at `/community` and `/community/[id]` for any signed-in user to browse — a separate `PublicIdentification` type deliberately excludes anything identifying the uploader (no email, no attribution) from that response.
+
+That's intentional groundwork: `/community` is gated behind sign-in for now, but designed so it can become a public, unauthenticated route later just by dropping `requireClerkAuth`/`requireApproval` from `api/src/routes/community.ts`, without needing new privacy work at that point — with one known exception. The signed image URL's storage path currently embeds the uploader's raw Clerk user ID (`bird-images/<clerk_user_id>/...`), which is visible in the URL string returned for a public share. That's an opaque token, not a name or email, but it does let someone tell that two public shares came from the same account. Worth closing (e.g. copying the image to a user-id-free path when it's shared) before `/community` actually goes fully public — left as-is for now since it's a minor gap and the page isn't reachable without an account yet anyway.
 
 ### 3. API (`api/`)
 
@@ -274,6 +282,7 @@ twitcher/
 
 - An admin-configurable model setting, so the Claude model used for identification can be changed without a code deploy
 - Automatic retention (delete identifications after X days, or beyond the most recent X) instead of only manual cleanup at `/admin/history`
+- Make `/community` actually public (drop its auth middleware) — first close the storage-path user-id leak described in [Community sharing](#community-sharing)
 
 ---
 

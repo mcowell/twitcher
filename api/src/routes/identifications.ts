@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireClerkAuth } from "../middleware/auth";
 import { requireApproval } from "../middleware/approval";
-import { listRecentIdentifications, getIdentificationById } from "../services/identifications";
+import { listRecentIdentifications, getIdentificationById, setIdentificationPublic } from "../services/identifications";
 
 export const identificationsRouter = Router();
 
@@ -35,3 +35,27 @@ identificationsRouter.get("/identifications/:id", requireClerkAuth, requireAppro
     next(error);
   }
 });
+
+identificationsRouter.patch(
+  "/identifications/:id/share",
+  requireClerkAuth,
+  requireApproval,
+  async (req, res, next) => {
+    try {
+      const { isPublic } = req.body;
+      if (typeof isPublic !== "boolean") {
+        res.status(400).json({ error: "isPublic must be a boolean." });
+        return;
+      }
+
+      const updated = await setIdentificationPublic(req.params.id as string, req.userId as string, isPublic);
+      if (!updated) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+);

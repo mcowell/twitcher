@@ -8,6 +8,7 @@ import { identificationsRouter } from "./routes/identifications";
 import { ingestRouter } from "./routes/ingest";
 import { queueRouter } from "./routes/queue";
 import { historyRouter } from "./routes/history";
+import { communityRouter } from "./routes/community";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
@@ -35,6 +36,7 @@ app.use("/", identificationsRouter);
 app.use("/", ingestRouter);
 app.use("/", queueRouter);
 app.use("/", historyRouter);
+app.use("/", communityRouter);
 
 app.use(errorHandler);
 
