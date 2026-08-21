@@ -1,12 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ServiceUnavailable } from "../../service-unavailable";
-import { ShareToggle } from "../../share-toggle";
+import { ServiceUnavailable } from "../../../service-unavailable";
+import { ShareToggle } from "../../../share-toggle";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-interface IdentificationDetail {
+interface AdminIdentificationDetail {
   id: string;
   imageUrl: string;
   commonName: string;
@@ -17,15 +17,16 @@ interface IdentificationDetail {
   alternativePossibilities: Array<{ commonName: string; scientificName: string; reason: string }>;
   createdAt: string;
   isPublic: boolean;
+  email: string | null;
 }
 
-const CONFIDENCE_STYLES: Record<IdentificationDetail["confidence"], string> = {
+const CONFIDENCE_STYLES: Record<AdminIdentificationDetail["confidence"], string> = {
   high: "bg-green-100 text-green-800",
   medium: "bg-amber-100 text-amber-800",
   low: "bg-red-100 text-red-800",
 };
 
-export default async function IdentificationDetailPage(props: PageProps<"/history/[id]">) {
+export default async function AdminIdentificationDetailPage(props: PageProps<"/admin/history/[id]">) {
   const { id } = await props.params;
   const { userId, getToken } = await auth();
   if (!userId) redirect("/");
@@ -33,7 +34,7 @@ export default async function IdentificationDetailPage(props: PageProps<"/histor
   let response: Response;
   try {
     const token = await getToken();
-    response = await fetch(`${API_BASE_URL}/identifications/${id}`, {
+    response = await fetch(`${API_BASE_URL}/admin/identifications/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
@@ -42,15 +43,23 @@ export default async function IdentificationDetailPage(props: PageProps<"/histor
     return <ServiceUnavailable />;
   }
 
+  if (response.status === 403) {
+    return (
+      <main className="flex-1 flex items-center justify-center p-8">
+        <p className="text-gray-500">You don&apos;t have access to this page.</p>
+      </main>
+    );
+  }
+
   if (response.status === 404) notFound();
   if (!response.ok) return <ServiceUnavailable />;
 
-  const item: IdentificationDetail = await response.json();
+  const item: AdminIdentificationDetail = await response.json();
 
   return (
     <main className="flex-1 p-8 max-w-2xl mx-auto w-full flex flex-col gap-6">
-      <Link href="/history" className="text-sm font-medium text-sky-700 hover:underline self-start">
-        ← Your identified birds
+      <Link href="/admin/history" className="text-sm font-medium text-sky-700 hover:underline self-start">
+        ← Identification history
       </Link>
 
       {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
@@ -82,10 +91,12 @@ export default async function IdentificationDetailPage(props: PageProps<"/histor
             </ul>
           </div>
         )}
-        {/* Plain ISO-date slice, not toLocaleDateString() — see admin-table.tsx */}
-        <p className="text-xs text-gray-400 mt-2">{item.createdAt.slice(0, 10)}</p>
+        <p className="text-xs text-gray-400 mt-2">
+          {item.email ?? "unknown"} · {/* Plain ISO-date slice, not toLocaleDateString() — see admin-table.tsx */}
+          {item.createdAt.slice(0, 10)}
+        </p>
         <div className="border-t border-gray-100 mt-2 pt-3">
-          <ShareToggle id={item.id} initialIsPublic={item.isPublic} />
+          <ShareToggle id={item.id} initialIsPublic={item.isPublic} adminOverride />
         </div>
       </div>
     </main>

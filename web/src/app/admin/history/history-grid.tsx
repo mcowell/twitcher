@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
 export interface HistoryIdentification {
@@ -120,39 +121,43 @@ export function HistoryGrid({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {items.map((item) => (
-          <label
+          <div
             key={item.id}
-            className={`relative rounded-2xl border p-2 flex flex-col gap-1 cursor-pointer transition-colors ${
+            className={`relative rounded-2xl border p-2 flex flex-col gap-1 transition-colors ${
               selected.has(item.id) ? "border-sky-500 bg-sky-50" : "border-gray-200 bg-white hover:border-sky-300"
             }`}
           >
-            <input
-              type="checkbox"
-              checked={selected.has(item.id)}
-              onChange={() => toggle(item.id)}
-              className="absolute top-3 left-3 h-4 w-4 z-10"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
-            <img
-              src={item.imageUrl}
-              alt={item.commonName}
-              className="w-full aspect-square object-cover rounded-lg"
-            />
-            <div className="flex items-center justify-between gap-1">
-              <p className="text-xs font-medium truncate">
-                {item.commonName}
-                {item.isFictionalOrCostume && " 🎭"}
-              </p>
-              <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${CONFIDENCE_STYLES[item.confidence]}`}
-              >
-                {item.confidence}
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 truncate">{item.email ?? "unknown"}</p>
-            {/* Plain ISO-date slice, not toLocaleDateString() — see admin-table.tsx */}
-            <p className="text-xs text-gray-400">{item.createdAt.slice(0, 10)}</p>
-          </label>
+            <label className="absolute top-3 left-3 z-10 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(item.id)}
+                onChange={() => toggle(item.id)}
+                className="h-4 w-4"
+              />
+            </label>
+            <Link href={`/admin/history/${item.id}`} className="flex flex-col gap-1">
+              {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase URL, not worth next/image remote-origin config */}
+              <img
+                src={item.imageUrl}
+                alt={item.commonName}
+                className="w-full aspect-square object-cover rounded-lg"
+              />
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-xs font-medium truncate">
+                  {item.commonName}
+                  {item.isFictionalOrCostume && " 🎭"}
+                </p>
+                <span
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${CONFIDENCE_STYLES[item.confidence]}`}
+                >
+                  {item.confidence}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 truncate">{item.email ?? "unknown"}</p>
+              {/* Plain ISO-date slice, not toLocaleDateString() — see admin-table.tsx */}
+              <p className="text-xs text-gray-400">{item.createdAt.slice(0, 10)}</p>
+            </Link>
+          </div>
         ))}
       </div>
 

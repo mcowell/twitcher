@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { requireClerkAuth } from "../middleware/auth";
 import { requireAdmin } from "../middleware/admin";
-import { listAllIdentifications, deleteIdentifications } from "../services/identifications";
+import {
+  listAllIdentifications,
+  deleteIdentifications,
+  getAnyIdentificationById,
+  setAnyIdentificationPublic,
+} from "../services/identifications";
 
 export const historyRouter = Router();
 
@@ -44,3 +49,40 @@ historyRouter.post("/admin/identifications/delete", requireClerkAuth, requireAdm
     next(error);
   }
 });
+
+historyRouter.get("/admin/identifications/:id", requireClerkAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const identification = await getAnyIdentificationById(req.params.id as string);
+    if (!identification) {
+      res.status(404).json({ error: "Not found." });
+      return;
+    }
+    res.json(identification);
+  } catch (error) {
+    next(error);
+  }
+});
+
+historyRouter.patch(
+  "/admin/identifications/:id/share",
+  requireClerkAuth,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const { isPublic } = req.body;
+      if (typeof isPublic !== "boolean") {
+        res.status(400).json({ error: "isPublic must be a boolean." });
+        return;
+      }
+
+      const updated = await setAnyIdentificationPublic(req.params.id as string, isPublic);
+      if (!updated) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+);

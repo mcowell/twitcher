@@ -5,11 +5,25 @@ import { useAuth } from "@clerk/nextjs";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export function ShareToggle({ id, initialIsPublic }: { id: string; initialIsPublic: boolean }) {
+export function ShareToggle({
+  id,
+  initialIsPublic,
+  adminOverride = false,
+}: {
+  id: string;
+  initialIsPublic: boolean;
+  // Uses the admin-scoped endpoint (no ownership check) so an admin can
+  // curate what's public regardless of who originally uploaded it.
+  adminOverride?: boolean;
+}) {
   const { getToken } = useAuth();
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const endpoint = adminOverride
+    ? `${API_BASE_URL}/admin/identifications/${id}/share`
+    : `${API_BASE_URL}/identifications/${id}/share`;
 
   async function toggle() {
     const next = !isPublic;
@@ -17,7 +31,7 @@ export function ShareToggle({ id, initialIsPublic }: { id: string; initialIsPubl
     setError(null);
     try {
       const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/identifications/${id}/share`, {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,

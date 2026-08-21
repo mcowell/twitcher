@@ -273,6 +273,23 @@ export async function getPublicIdentificationById(id: string): Promise<PublicIde
   };
 }
 
+function mapRowWithUser(row: IdentificationRowWithUser, imageUrl: string): HistoryIdentification {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    imageUrl,
+    isBird: row.is_bird,
+    isFictionalOrCostume: row.is_fictional_or_costume,
+    commonName: row.common_name,
+    scientificName: row.scientific_name,
+    confidence: row.confidence,
+    description: row.description,
+    alternativePossibilities: row.alternative_possibilities,
+    isPublic: row.is_public,
+    email: row.app_users?.email ?? null,
+  };
+}
+
 // Admin-only view across every user's identifications (not just the
 // caller's own), for browsing/cleaning up history — e.g. bulk-approved
 // Frigate images. Paginated via limit/offset since this can grow
@@ -295,20 +312,48 @@ export async function listAllIdentifications(limit: number, offset: number): Pro
     );
   if (signError) throw signError;
 
-  return data.map((row, index) => ({
-    id: row.id,
-    createdAt: row.created_at,
-    imageUrl: signedUrls[index]?.signedUrl ?? "",
-    isBird: row.is_bird,
-    isFictionalOrCostume: row.is_fictional_or_costume,
-    commonName: row.common_name,
-    scientificName: row.scientific_name,
-    confidence: row.confidence,
-    description: row.description,
-    alternativePossibilities: row.alternative_possibilities,
-    isPublic: row.is_public,
-    email: row.app_users?.email ?? null,
-  }));
+  return data.map((row, index) => mapRowWithUser(row, signedUrls[index]?.signedUrl ?? ""));
+}
+
+// Admin-only, no ownership filter — any admin can view any user's
+// identification, unlike getIdentificationById which is scoped to the
+// caller's own.
+export async function getAnyIdentificationById(id: string): Promise<HistoryIdentification | null> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .select("*, app_users(email)")
+    .eq("id", id)
+    .maybeSingle<IdentificationRowWithUser>();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: signedUrlData, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+  if (signError) throw signError;
+
+  return mapRowWithUser(data, signedUrlData.signedUrl);
+}
+
+// Admin-only, no ownership filter — lets an admin curate what's publicly
+// visible regardless of who originally uploaded it (e.g. sharing a good
+// Frigate catch that got approved under someone else's account).
+export async function setAnyIdentificationPublic(id: string, isPublic: boolean): Promise<HistoryIdentification | null> {
+  const { data, error } = await supabase
+    .from("identifications")
+    .update({ is_public: isPublic })
+    .eq("id", id)
+    .select("*, app_users(email)")
+    .maybeSingle<IdentificationRowWithUser>();
+  if (error) throw error;
+  if (!data) return null;
+
+  const { data: signedUrlData, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(data.image_path, SIGNED_URL_TTL_SECONDS);
+  if (signError) throw signError;
+
+  return mapRowWithUser(data, signedUrlData.signedUrl);
 }
 
 export async function deleteIdentifications(ids: string[]): Promise<void> {
