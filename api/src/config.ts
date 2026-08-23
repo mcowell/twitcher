@@ -24,7 +24,11 @@ export const config = {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
-  maxUploadBytes: 10 * 1024 * 1024, // 10MB
+  // Generous on purpose — modern phone cameras routinely produce 10-20MB
+  // JPEGs. The /identify route resizes/re-encodes before ever calling
+  // Claude or storing anything, so accepting a large original doesn't mean
+  // a large payload gets sent or stored downstream.
+  maxUploadBytes: 25 * 1024 * 1024, // 25MB
   // Fastmail SMTP, used only to notify admins when a new account signs up
   // and needs approval. smtpUser is the Fastmail account login (not
   // necessarily the same as the From address below), authenticated with an

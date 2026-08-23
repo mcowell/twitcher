@@ -272,6 +272,10 @@ That cold start isn't just slow — while a service is asleep, Render can serve 
 
 The model is `claude-opus-5`. It started out on `claude-haiku-4-5` — the cheapest current Claude tier — on the theory that bird ID from a photo is a bounded classification task that wouldn't benefit much from a larger model. In practice, Haiku misidentified some harder photos (a wasp photographed near a roof, read as a house sparrow), so this trades a higher per-request cost for meaningfully better vision accuracy. Structured output is enforced via `output_config.format` (JSON schema), so the response is always parseable — no prompt-and-pray JSON extraction.
 
+## Upload size and resizing
+
+`/identify` accepts uploads up to 25MB (`config.maxUploadBytes`) — generous on purpose, since modern phone cameras routinely produce 10-20MB JPEGs and there's no reason to bounce a legitimate photo at the door. Before ever calling Claude or storing anything, the route resizes/re-encodes the image via `sharp`: capped to 1568px on the long edge (Claude's vision performs best around there anyway — bigger just gets downscaled internally, wasting bandwidth and tokens on detail that never helps), JPEG quality 90, with `.autoOrient()` applied first so a phone photo's "rotate this for display" EXIF tag gets baked into the actual pixels rather than silently dropped on re-encode (the same class of bug fixed on `/community`'s share path). The resized version is what's stored too, not the original — the app never displays anything close to full phone-camera resolution, so there's no reason to keep the larger original around.
+
 ## Project layout
 
 ```
