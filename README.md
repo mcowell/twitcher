@@ -140,9 +140,9 @@ await clerkClient.users.updateUserMetadata(clerkUserId, {
 
 `privateMetadata` is only ever readable from server-side Clerk API calls, never from the frontend SDK, so this can't leak to the browser.
 
-### New-signup email notifications
+### New-signup and approval email notifications
 
-`/admin` also has a small "Notify on new signups" panel — add or remove email addresses, and each one gets emailed the moment a new account signs up and lands in `pending` (see `notifyAdminsOfNewSignup` in `api/src/services/appUsers.ts`, fired best-effort from the same lazy-create-on-first-sight path that creates the `app_users` row). The list itself lives in a `notification_emails` table:
+`/admin` also has a small "Notify on new signups" panel — add or remove email addresses, and each one gets emailed the moment a new account signs up and lands in `pending` (see `notifyAdminsOfNewSignup` in `api/src/services/appUsers.ts`, fired best-effort from the same lazy-create-on-first-sight path that creates the `app_users` row), with a full link straight to `/admin` (via `config.appUrl`) to approve them. The user themselves gets a separate email once they're actually approved (`notifyUserOfApproval`, fired from `updateAppUserStatus`) — only on a genuine transition into `approved`, not on every write, so an admin re-clicking Approve on someone already approved (e.g. from a bulk selection that included them by accident) doesn't resend it. The list itself lives in a `notification_emails` table:
 
 ```sql
 create table notification_emails (
@@ -257,6 +257,7 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
    | `twitcher-api` | `NOTIFICATION_FROM_EMAIL` | same value as local `api/.env` |
    | `twitcher-api` | `FRIGATE_INGEST_SECRET` | same value as local `api/.env` (and `frigate-relay`'s `INGEST_SECRET`) |
    | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
+   | `twitcher-api` | `APP_URL` | `https://twitcher.yourdomain.com` (no trailing slash) |
 
 3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).
 

@@ -30,6 +30,9 @@ services:
       # check — value: https://twitcher.yourdomain.com (see README).
       - key: ALLOWED_ORIGINS
         sync: false
+      # Used only to build full links in emails — value: https://twitcher.yourdomain.com (no trailing slash)
+      - key: APP_URL
+        sync: false
 
   # Next.js frontend — Clerk-gated UI
   - type: web

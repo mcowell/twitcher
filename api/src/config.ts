@@ -41,4 +41,8 @@ export const config = {
   // signing in on that path, so a Clerk JWT doesn't apply. Scoped to only
   // that one route (see requireIngestSecret).
   frigateIngestSecret: requireEnv("FRIGATE_INGEST_SECRET"),
+  // The web frontend's public URL, e.g. "https://twitcher.yourdomain.com" —
+  // used only to build full links in emails (approval notifications, the
+  // admin new-signup alert). No trailing slash.
+  appUrl: requireEnv("APP_URL"),
 };

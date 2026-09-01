@@ -3,6 +3,7 @@ import { clerkClient } from "./clerk";
 import { sendMail } from "./mailer";
 import { listNotificationEmails } from "./notificationEmails";
 import { deleteAllForUser } from "./identifications";
+import { config } from "../config";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -93,7 +94,15 @@ async function notifyAdminsOfNewSignup(email: string | null): Promise<void> {
   await sendMail(
     recipients,
     "Twitcher: new account needs approval",
-    `${email ?? "A new user"} just signed up and is waiting for approval.\n\nApprove at: /admin`,
+    `${email ?? "A new user"} just signed up and is waiting for approval.\n\nApprove at: ${config.appUrl}/admin`,
+  );
+}
+
+async function notifyUserOfApproval(email: string): Promise<void> {
+  await sendMail(
+    [email],
+    "Your Twitcher account has been approved",
+    `Good news — your Twitcher account has been approved.\n\nStart identifying birds here: ${config.appUrl}`,
   );
 }
 
@@ -108,14 +117,30 @@ export async function listAppUsers(): Promise<AppUser[]> {
 }
 
 export async function updateAppUserStatus(clerkUserId: string, status: ApprovalStatus): Promise<AppUser> {
+  const { data: existing, error: fetchError } = await supabase
+    .from("app_users")
+    .select("status")
+    .eq("clerk_user_id", clerkUserId)
+    .single<Pick<AppUserRow, "status">>();
+  if (fetchError) throw fetchError;
+
   const { data, error } = await supabase
     .from("app_users")
     .update({ status, approved_at: status === "approved" ? new Date().toISOString() : null })
     .eq("clerk_user_id", clerkUserId)
     .select()
     .single<AppUserRow>();
-
   if (error) throw error;
+
+  // Only on an actual transition into "approved" — an admin re-clicking
+  // Approve on someone already approved (e.g. via a bulk selection that
+  // included them by accident) shouldn't resend the email.
+  if (status === "approved" && existing.status !== "approved" && data.email) {
+    notifyUserOfApproval(data.email).catch((error) => {
+      console.error("Failed to send approval notification email:", error);
+    });
+  }
+
   return mapRow(data);
 }
 
