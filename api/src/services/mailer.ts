@@ -14,12 +14,18 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export async function sendMail(to: string[], subject: string, text: string): Promise<void> {
+export async function sendMail(
+  to: string[],
+  subject: string,
+  text: string,
+  options?: { replyTo?: string },
+): Promise<void> {
   if (to.length === 0) return;
 
   await transporter.sendMail({
     from: config.notificationFromEmail,
     to,
+    replyTo: options?.replyTo,
     subject,
     text,
   });

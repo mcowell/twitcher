@@ -9,9 +9,16 @@ import { ingestRouter } from "./routes/ingest";
 import { queueRouter } from "./routes/queue";
 import { historyRouter } from "./routes/history";
 import { communityRouter } from "./routes/community";
+import { contactRouter } from "./routes/contact";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
+
+// Render sits in front of this app as a reverse proxy — without this,
+// req.ip resolves to Render's proxy address for every request (same value
+// for every visitor), which would silently collapse /contact's
+// per-IP rate limit into one shared global bucket instead of a per-visitor one.
+app.set("trust proxy", 1);
 
 // CORS only controls which browser origins may read the response — it is
 // NOT the security boundary (a non-browser client ignores it entirely).
@@ -37,6 +44,7 @@ app.use("/", ingestRouter);
 app.use("/", queueRouter);
 app.use("/", historyRouter);
 app.use("/", communityRouter);
+app.use("/", contactRouter);
 
 app.use(errorHandler);
 

@@ -33,6 +33,9 @@ services:
       # Used only to build full links in emails — value: https://twitcher.yourdomain.com (no trailing slash)
       - key: APP_URL
         sync: false
+      # Where POST /contact delivers to — value: an email address you control
+      - key: CONTACT_FORM_TO_EMAIL
+        sync: false
 
   # Next.js frontend — Clerk-gated UI
   - type: web

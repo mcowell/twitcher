@@ -158,6 +158,10 @@ Sending goes through **Fastmail's SMTP relay** (`smtp.fastmail.com:587`, via `no
 2. Generate an app password scoped to **Mail/SMTP only** (**Settings → Password & Security → App Passwords**) — not your account password.
 3. Set `SMTP_USER` (your Fastmail login), `SMTP_PASSWORD` (the app password), and `NOTIFICATION_FROM_EMAIL` (the alias from step 1) in `api/.env`.
 
+### Contact form forwarding for other static sites
+
+`POST /contact` is a small, fully unauthenticated route (no Clerk token — there's no session to check) that lets other static sites you own forward their contact form to `CONTACT_FORM_TO_EMAIL` via the same Fastmail sender used for signup notifications, with the visitor's address set as `Reply-To`. Since it's the one route on this API with no auth gate, it has its own defenses instead: a server-side honeypot check (a hidden `company` field — real visitors never fill it in) and a per-IP in-memory rate limit (5 requests/hour), both in `api/src/routes/contact.ts`. Each site's own origin needs to be added to `ALLOWED_ORIGINS` alongside Twitcher's own frontend for CORS to allow it through.
+
 ### Frigate ingestion
 
 A [Frigate](https://frigate.video) NVR watching a bird feeder can easily produce hundreds of detections a day, most of them the same few birds visiting repeatedly — sending every one to Claude would be wasteful and mostly redundant. So there's a staging step instead of a direct pipe to `/identify`:
@@ -256,8 +260,9 @@ Each subdomain needs a CNAME at your DNS provider: `twitcher.yourdomain.com` and
    | `twitcher-api` | `SMTP_PASSWORD` | same value as local `api/.env` |
    | `twitcher-api` | `NOTIFICATION_FROM_EMAIL` | same value as local `api/.env` |
    | `twitcher-api` | `FRIGATE_INGEST_SECRET` | same value as local `api/.env` (and `frigate-relay`'s `INGEST_SECRET`) |
-   | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` |
+   | `twitcher-api` | `ALLOWED_ORIGINS` | `https://twitcher.yourdomain.com` (comma-separate any other site using `/contact`) |
    | `twitcher-api` | `APP_URL` | `https://twitcher.yourdomain.com` (no trailing slash) |
+   | `twitcher-api` | `CONTACT_FORM_TO_EMAIL` | an email address you control |
 
 3. On each service, Settings → Add Custom Domain, then add the CNAME Render gives you at your DNS provider (see [Custom domain](#custom-domain) above).
 

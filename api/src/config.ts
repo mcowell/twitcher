@@ -45,4 +45,8 @@ export const config = {
   // used only to build full links in emails (approval notifications, the
   // admin new-signup alert). No trailing slash.
   appUrl: requireEnv("APP_URL"),
+  // Where POST /contact delivers submissions from other static sites'
+  // contact forms — reuses this API's existing Fastmail sender rather than
+  // standing up a separate mail service for each of them.
+  contactFormToEmail: requireEnv("CONTACT_FORM_TO_EMAIL"),
 };
