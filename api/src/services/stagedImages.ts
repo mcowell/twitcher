@@ -126,6 +126,37 @@ export async function deleteStagedImages(ids: string[]): Promise<void> {
   await removeStagedRows(rows);
 }
 
+const PURGE_BATCH_SIZE = 500;
+
+// Deletes queued images older than the retention window, image file and row
+// alike. Works in batches so a big backlog (e.g. the first run after
+// enabling retention) doesn't become one giant storage request. Returns how
+// many were removed.
+export async function purgeExpiredStagedImages(retentionDays: number): Promise<number> {
+  if (retentionDays <= 0) return 0;
+
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  let purged = 0;
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from("staged_images")
+      .select("*")
+      .lt("created_at", cutoff)
+      .order("created_at", { ascending: true })
+      .limit(PURGE_BATCH_SIZE)
+      .returns<StagedImageRow[]>();
+    if (error) throw error;
+    if (data.length === 0) break;
+
+    await removeStagedRows(data);
+    purged += data.length;
+    if (data.length < PURGE_BATCH_SIZE) break;
+  }
+
+  return purged;
+}
+
 export interface ApproveResult {
   id: string;
   ok: boolean;

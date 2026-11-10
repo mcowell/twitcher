@@ -4,6 +4,8 @@ import { requireAdmin } from "../middleware/admin";
 import { listAppUsers, updateAppUserStatus, deleteAppUser, type ApprovalStatus } from "../services/appUsers";
 import { listNotificationEmails, addNotificationEmail, removeNotificationEmail } from "../services/notificationEmails";
 import { getStorageStats } from "../services/storageStats";
+import { getStagedRetentionDays, setStagedRetentionDays, MAX_STAGED_RETENTION_DAYS } from "../services/settings";
+import { runStagedRetention } from "../services/retentionJob";
 
 export const adminRouter = Router();
 
@@ -88,6 +90,31 @@ adminRouter.delete(
 adminRouter.get("/admin/storage-stats", requireClerkAuth, requireAdmin, async (_req, res, next) => {
   try {
     res.json(await getStorageStats());
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/admin/settings/staged-retention", requireClerkAuth, requireAdmin, async (_req, res, next) => {
+  try {
+    res.json({ days: await getStagedRetentionDays() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.put("/admin/settings/staged-retention", requireClerkAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const { days } = req.body ?? {};
+    if (!Number.isInteger(days) || days < 0 || days > MAX_STAGED_RETENTION_DAYS) {
+      res.status(400).json({ error: `days must be a whole number from 0 to ${MAX_STAGED_RETENTION_DAYS}.` });
+      return;
+    }
+
+    await setStagedRetentionDays(days);
+    // Apply a shortened window right away instead of waiting for the next hourly run.
+    void runStagedRetention();
+    res.json({ days });
   } catch (error) {
     next(error);
   }

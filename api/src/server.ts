@@ -11,6 +11,7 @@ import { historyRouter } from "./routes/history";
 import { communityRouter } from "./routes/community";
 import { contactRouter } from "./routes/contact";
 import { errorHandler } from "./middleware/errorHandler";
+import { startRetentionJob } from "./services/retentionJob";
 
 const app = express();
 
@@ -50,4 +51,5 @@ app.use(errorHandler);
 
 app.listen(config.port, () => {
   console.log(`bird-id API listening on http://localhost:${config.port}`);
+  startRetentionJob();
 });

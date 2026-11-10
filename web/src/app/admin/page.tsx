@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AdminTable, type AppUser } from "./admin-table";
 import { NotificationEmails } from "./notification-emails";
 import { StorageStatsCard, type StorageStats } from "./storage-stats";
+import { StagedRetention } from "./staged-retention";
 import { ServiceUnavailable } from "../service-unavailable";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -15,10 +16,11 @@ export default async function AdminPage() {
   let usersResponse: Response;
   let emailsResponse: Response;
   let storageResponse: Response;
+  let retentionResponse: Response;
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
-    [usersResponse, emailsResponse, storageResponse] = await Promise.all([
+    [usersResponse, emailsResponse, storageResponse, retentionResponse] = await Promise.all([
       fetch(`${API_BASE_URL}/admin/users`, { headers, cache: "no-store", signal: AbortSignal.timeout(20_000) }),
       fetch(`${API_BASE_URL}/admin/notification-emails`, {
         headers,
@@ -26,6 +28,11 @@ export default async function AdminPage() {
         signal: AbortSignal.timeout(20_000),
       }),
       fetch(`${API_BASE_URL}/admin/storage-stats`, {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      }),
+      fetch(`${API_BASE_URL}/admin/settings/staged-retention`, {
         headers,
         cache: "no-store",
         signal: AbortSignal.timeout(20_000),
@@ -43,11 +50,14 @@ export default async function AdminPage() {
     );
   }
 
-  if (!usersResponse.ok || !emailsResponse.ok || !storageResponse.ok) return <ServiceUnavailable />;
+  if (!usersResponse.ok || !emailsResponse.ok || !storageResponse.ok || !retentionResponse.ok) {
+    return <ServiceUnavailable />;
+  }
 
   const users: AppUser[] = await usersResponse.json();
   const notificationEmails: string[] = await emailsResponse.json();
   const storageStats: StorageStats = await storageResponse.json();
+  const { days: retentionDays }: { days: number } = await retentionResponse.json();
 
   return (
     <main className="flex-1 p-8 max-w-4xl mx-auto w-full flex flex-col gap-6">
@@ -67,6 +77,7 @@ export default async function AdminPage() {
         <AdminTable initialUsers={users} />
       </div>
       <NotificationEmails initialEmails={notificationEmails} />
+      <StagedRetention initialDays={retentionDays} />
     </main>
   );
 }
